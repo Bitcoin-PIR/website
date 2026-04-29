@@ -1,0 +1,358 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+
+// Toy example: N = 8, T = 4, M = 4. 2N = 16 cells in the hint row.
+// 8 real indices (0..7) randomly permuted among the 16 cells, the other
+// 8 cells are ⊥. Segments are partial — this matches the paper's own
+// Figure 1 (page 3), which shows a segment of the form [2, ⊥, ⊥, 1].
+const cells: (number | null)[] = [
+  3, 6, null, null,   // Segment 0  — contains the query target (q = 6 at cell 1)
+  7, null, 4, null,   // Segment 1
+  null, 5, 0, null,   // Segment 2  — replacement will come from here (cell 10)
+  null, 1, null, 2,   // Segment 3
+];
+const cellW = 36;
+const cellH = 30;
+const gap = 2;
+const rowX = 20;
+const rowY = 50;
+const T = 4;
+
+// Query example: q = 6 is at cell 1 (segment 0, position r = 1 within the segment).
+// Segment 0 contents are [3, 6, ⊥, ⊥]. The client builds Q by reading segment 0
+// top-to-bottom and swapping position r with Access(cell 10) = 0.
+// Q ends up = [3, 0, ⊥, ⊥]: Q[0]=3 (original), Q[1]=0 (swap), Q[2]=⊥, Q[3]=⊥.
+// Cell 10 sits at position 2 of segment 2 — a different within-segment position
+// than r, matching the paper's Algorithm 3 line 8 (sample uniformly; no
+// positional constraint).
+const queryValue = 6;
+const queryCell = 1;
+const swapCell = 10;
+const requestValues: (number | null)[] = [3, 0, null, null];
+---
+
+<Section id="harmonypir-hint-row" num="06" title="HarmonyPIR — the hint row">
+  <p>
+    The client's local state after the offline phase is one long row of
+    <code>2N</code> cells, called the <strong>hint row</strong>. Half the
+    cells hold real database indices, permuted randomly; the other half are
+    empty (written <code>⊥</code>). The permutation is private to the client
+    — the server never learns which cell holds which index.
+  </p>
+  <p>
+    The row is then split into <code>M = 2N/T</code> contiguous
+    <strong>segments</strong> of <code>T</code> cells each. For every
+    segment, the client stores one small value, the <strong>hint parity</strong>:
+    the XOR of the database entries at the real indices in that segment.
+    That's it — <code>M</code> hint parities total, each the size of one
+    database row. For a balanced choice <code>T ≈ √(2N)</code> the hint
+    store comes out to √<code>N</code> rows' worth of data.
+  </p>
+
+  <Stage
+    caption="Toy example: N=8, T=4. The client's hint row has 16 cells; 8 hold real indices 0..7, permuted; 8 are empty. One hint parity per segment."
+    label="Hint row + hint parities"
+  >
+    <svg viewBox="0 0 680 260" role="img"
+      aria-label="Sixteen cells split into four segments; each segment's real indices XOR into a single hint parity below.">
+
+      <text x="20" y="24" font-size="11" font-weight="700" fill="var(--fg)">
+        Hint row — 2N = 16 cells, grouped into M = 4 segments of T = 4
+      </text>
+
+      {cells.map((v, i) => {
+        const x = rowX + i * (cellW + gap);
+        const isReal = v !== null;
+        return (
+          <g>
+            <rect x={x} y={rowY} width={cellW} height={cellH} rx="3"
+              fill={isReal ? "var(--accent-bg)" : "var(--bg-elev-2)"}
+              stroke={isReal ? "var(--accent)" : "var(--border)"}/>
+            <text x={x + cellW / 2} y={rowY + cellH / 2 + 4}
+              text-anchor="middle" font-size="11"
+              font-family="ui-monospace, monospace"
+              fill={isReal ? "var(--accent)" : "var(--fg-dim)"}
+              font-weight="600">
+              {isReal ? v : "⊥"}
+            </text>
+          </g>
+        );
+      })}
+
+      <!-- Segment dividers (between T-sized chunks) -->
+      {[1, 2, 3].map((k) => {
+        const x = rowX + k * T * (cellW + gap) - gap / 2;
+        return (
+          <line x1={x} y1={rowY - 4} x2={x} y2={rowY + cellH + 20}
+            stroke="var(--fg-muted)" stroke-width="1"/>
+        );
+      })}
+
+      <!-- Segment labels -->
+      {[0, 1, 2, 3].map((s) => {
+        const x = rowX + s * T * (cellW + gap) + (T * (cellW + gap)) / 2 - gap / 2;
+        return (
+          <text x={x} y={rowY + cellH + 15} text-anchor="middle"
+            class="svg-label" font-size="10">Seg {s}</text>
+        );
+      })}
+
+      <!-- Hint parities stacked below — one line per segment, full-width boxes
+           so the XOR of four indices isn't cramped. -->
+      <text x="20" y="122" font-size="11" font-weight="700" fill="var(--fg)">
+        Hint parities (stored locally by the client)
+      </text>
+      {[
+        { s: 0, text: "H[0]  =  DB[3] ⊕ DB[6]", note: "from segment 0" },
+        { s: 1, text: "H[1]  =  DB[7] ⊕ DB[4]", note: "from segment 1" },
+        { s: 2, text: "H[2]  =  DB[5] ⊕ DB[0]", note: "from segment 2" },
+        { s: 3, text: "H[3]  =  DB[1] ⊕ DB[2]", note: "from segment 3" },
+      ].map(({ text, note }, i) => {
+        const y = 134 + i * 22;
+        return (
+          <g>
+            <rect x="20" y={y} width="640" height="18" rx="3"
+              fill="var(--bg-elev-2)" stroke="var(--border)"/>
+            <text x="32" y={y + 13} font-size="10.5"
+              font-family="ui-monospace, monospace" fill="var(--fg-muted)">
+              {text}
+            </text>
+            <text x="648" y={y + 13} text-anchor="end" font-size="9"
+              class="svg-label" fill="var(--fg-dim)" font-style="italic">
+              {note}
+            </text>
+          </g>
+        );
+      })}
+
+      <text x="20" y="244" font-size="10" class="svg-label" fill="var(--fg-muted)" font-style="italic">
+        For N ≈ 2²⁰ with T ≈ √(2N) ≈ 1448: the client keeps ~1448 hint
+        parities, each one row wide — √N storage total.
+      </text>
+    </svg>
+  </Stage>
+
+  <h3 style="margin-top: 1.5rem;">One online query, from start to finish</h3>
+  <p>
+    Say the client wants database row <code>q = 6</code>. It looks up where
+    the value <code>6</code> lives in its hint row: segment <code>s = 0</code>,
+    position <code>r = 1</code>. Segment <code>0</code>'s contents are
+    <code>[3, 6, ⊥, ⊥]</code> — only two of its four cells hold real
+    indices, the other two are empty. The client builds the request
+    <code>Q</code> by copying segment <code>0</code>'s contents straight
+    through, <em>except</em> it replaces slot <code>r</code> with the
+    value at a uniformly sampled cell outside segment <code>0</code> —
+    say cell <code>10</code>, which holds <code>0</code>. (The algorithm
+    picks that cell uniformly from the whole hint row outside segment
+    <code>s</code>; there's no constraint on its within-segment position.)
+  </p>
+  <p>
+    The resulting request <code>Q = [3, 0, ⊥, ⊥]</code> goes to the server
+    as plain database indices, with <code>⊥</code> marking slots the
+    server should skip. The server looks up the non-empty entries and
+    returns <code>R[0] = DB[3]</code> and <code>R[1] = DB[0]</code>;
+    positions <code>2</code> and <code>3</code> have no response. The
+    client XORs its stored parity against every returned value at a
+    position other than <code>r</code>:
+  </p>
+  <pre><code>answer = H[0] ⊕ R[0]
+       = (DB[3] ⊕ DB[6]) ⊕ DB[3]
+       = DB[6]</code></pre>
+  <p>
+    <code>R[1]</code> is skipped because that was the swap position — its
+    value, <code>DB[0]</code>, has nothing to do with <code>q</code>.
+    <code>R[2]</code> and <code>R[3]</code> simply don't exist; if you
+    prefer to write them, treat them as <code>0</code>, which leaves the
+    XOR unchanged. In a <em>full</em> segment of four real values, the
+    answer line would have four terms instead of one — the same formula,
+    just more non-⊥ slots to XOR.
+  </p>
+
+  <Stage
+    caption="Request Q is a length-T batch built from segment s, with position r swapped to a freshly sampled random cell. The client already holds H[s]; the server's response completes the XOR that isolates DB[q]."
+    label="One query: Q, R, and the XOR that recovers DB[q]"
+  >
+    <svg viewBox="0 0 680 300" role="img"
+      aria-label="Walkthrough: locate q in the hint row, build request Q of T indices with one slot swapped, receive response R, XOR with H[s] to get DB[q]."
+      data-anim="harmony-query">
+
+      <defs>
+        <marker id="hq-arr" viewBox="0 0 10 10" refX="8" refY="5"
+          markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--fg-muted)"/>
+        </marker>
+      </defs>
+
+      <!-- Hint row (condensed) -->
+      <text x="20" y="18" font-size="10" font-weight="700" fill="var(--fg)">
+        1. Locate q = 6 → cell 1 (segment 0, position 1)
+      </text>
+      {cells.map((v, i) => {
+        const smallW = 32;
+        const smallGap = 2;
+        const x = 20 + i * (smallW + smallGap);
+        const y = 28;
+        const isReal = v !== null;
+        const isQuery = i === queryCell;
+        const isSwap = i === swapCell;
+        return (
+          <g class={isQuery ? "step step-q" : (isSwap ? "step step-swap" : "")}>
+            <rect x={x} y={y} width={smallW} height={26} rx="3"
+              fill={isQuery ? "var(--ok)"
+                : isSwap ? "#e8a33c"
+                : isReal ? "var(--accent-bg)"
+                : "var(--bg-elev-2)"}
+              stroke={isQuery ? "var(--ok)"
+                : isSwap ? "#c98728"
+                : isReal ? "var(--accent)"
+                : "var(--border)"}
+              stroke-width={isQuery || isSwap ? "1.5" : "1"}/>
+            <text x={x + smallW / 2} y={y + 17}
+              text-anchor="middle" font-size="10"
+              font-family="ui-monospace, monospace"
+              fill={isQuery ? "#0a0b0f"
+                : isSwap ? "#0a0b0f"
+                : isReal ? "var(--accent)"
+                : "var(--fg-dim)"}
+              font-weight={isQuery || isSwap ? "700" : "500"}>
+              {isReal ? v : "⊥"}
+            </text>
+          </g>
+        );
+      })}
+      {/* Segment dividers on the small row */}
+      {[1, 2, 3].map((k) => {
+        const x = 20 + k * T * 34 - 1;
+        return (
+          <line x1={x} y1={24} x2={x} y2={58}
+            stroke="var(--fg-muted)" stroke-width="1"/>
+        );
+      })}
+
+      <!-- Request Q -->
+      <text x="20" y="90" font-size="10" font-weight="700" fill="var(--fg)">
+        2. Build request Q — copy segment 0's contents, swap position r = 1 with cell 10's value
+      </text>
+      {requestValues.map((v, i) => {
+        const x = 20 + i * 60;
+        const y = 100;
+        const isSwap = i === 1;
+        const isEmpty = v === null;
+        return (
+          <g class="step step-req">
+            <rect x={x} y={y} width={54} height={30} rx="4"
+              fill={isEmpty ? "var(--bg-elev-2)"
+                : isSwap ? "#e8a33c"
+                : "var(--accent)"}
+              opacity={isEmpty ? "1" : isSwap ? "0.85" : "0.75"}
+              stroke={isEmpty ? "var(--border)"
+                : isSwap ? "#c98728"
+                : "var(--accent)"}/>
+            <text x={x + 27} y={y + 19}
+              text-anchor="middle" font-size="11"
+              font-family="ui-monospace, monospace"
+              fill={isEmpty ? "var(--fg-dim)" : "#0a0b0f"}
+              font-weight="700">
+              Q[{i}]={isEmpty ? "⊥" : v}
+            </text>
+          </g>
+        );
+      })}
+      <text x="80" y="148" font-size="9" class="svg-label" fill="var(--fg-muted)" font-style="italic">
+        sampled from cell 10
+      </text>
+      <text x="440" y="148" font-size="9" class="svg-label" fill="var(--fg-muted)" font-style="italic" text-anchor="middle">
+        ⊥ slots come from the empty cells of segment 0 — server skips them
+      </text>
+
+      <!-- Server + response -->
+      <text x="20" y="178" font-size="10" font-weight="700" fill="var(--fg)">
+        3. Server looks up each non-⊥ slot and returns those rows
+      </text>
+      <g class="step step-resp">
+        <rect x="20" y="188" width="640" height="34" rx="5"
+          fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <text x="340" y="209" text-anchor="middle" font-size="11"
+          font-family="ui-monospace, monospace" fill="var(--fg)">
+          R[0] = DB[3],   R[1] = DB[0]          (R[2], R[3] absent — Q had ⊥ there)
+        </text>
+      </g>
+
+      <!-- XOR -->
+      <text x="20" y="246" font-size="10" font-weight="700" fill="var(--fg)">
+        4. XOR H[0] with every returned R[i] at a position other than r = 1
+      </text>
+      <g class="step step-answer">
+        <rect x="20" y="256" width="640" height="30" rx="5"
+          fill="var(--ok)" opacity="0.18" stroke="var(--ok)"/>
+        <text x="340" y="276" text-anchor="middle" font-size="11"
+          font-family="ui-monospace, monospace" fill="var(--ok)" font-weight="700">
+          H[0] ⊕ R[0]  =  (DB[3] ⊕ DB[6]) ⊕ DB[3]  =  DB[6]   ✓
+        </text>
+      </g>
+    </svg>
+  </Stage>
+
+  <p>
+    Two things are worth pausing on. First, privacy: the server sees a
+    length-<code>T</code> batch of plain database indices (some of them
+    <code>⊥</code>). Because the hint row is a uniformly random
+    permutation hidden from the server — and because slot <code>r</code>
+    was replaced by the value at an independently sampled random cell —
+    the distribution of that batch is indistinguishable from a uniform
+    sample of <code>T</code> cells from the whole hint row. The batch
+    contains <code>q</code>, but the server can't point to which slot it
+    is, and can't even rule out slots whose values came from segment
+    <code>s</code>'s other cells. Second, efficiency: the request has at
+    most <code>T</code> indices, the response at most <code>T</code> rows,
+    and the client's online work is a handful of XORs plus one hint
+    lookup. With <code>T ≈ √(2N)</code> that's √<code>N</code> work
+    online, against a total database of <code>N</code> rows.
+  </p>
+  <p>
+    We've glossed over one thing: after the query runs, the hint row has
+    to change — otherwise a second query into the same segment would leak.
+    The next page handles that, and the crypto choice that makes the whole
+    scheme run fast enough to matter.
+  </p>
+</Section>
+
+<style>
+  [data-anim="harmony-query"] .step { opacity: 0; }
+
+  [data-anim="harmony-query"].play .step-q {
+    animation: hq-in 0.5s var(--ease) 0.2s forwards;
+  }
+  [data-anim="harmony-query"].play .step-swap {
+    animation: hq-in 0.5s var(--ease) 1.0s forwards;
+  }
+  [data-anim="harmony-query"].play .step-req {
+    animation: hq-in 0.5s var(--ease) 1.6s forwards;
+  }
+  [data-anim="harmony-query"].play .step-resp {
+    animation: hq-in 0.5s var(--ease) 2.4s forwards;
+  }
+  [data-anim="harmony-query"].play .step-answer {
+    animation: hq-in 0.5s var(--ease) 3.0s forwards;
+  }
+
+  @keyframes hq-in { to { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="harmony-query"] .step { opacity: 1 !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="harmony-query"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

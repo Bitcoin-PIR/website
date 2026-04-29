@@ -1,0 +1,138 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+---
+
+<Section id="pir-primer" num="02" title="PIR in one picture">
+  <p>
+    A PIR protocol has two guarantees worth memorizing:
+  </p>
+  <ol>
+    <li>
+      <strong>Correctness.</strong> If you ask for row <code>i</code>, you
+      get row <code>i</code>.
+    </li>
+    <li>
+      <strong>Privacy.</strong> The server cannot learn <em>which</em> row
+      you asked for — its view of the query is indistinguishable across all
+      valid indices.
+    </li>
+  </ol>
+  <p>
+    The mechanical implication of (2) is that the server must <em>touch every
+    row identically</em>. If it could skip even one row, it would learn
+    something about which row you didn't want. Every PIR backend differs in
+    <em>how</em> it forces the server to touch all rows — but they all do.
+  </p>
+
+  <Stage
+    caption="A query reaches the DB, every row is processed identically, a response returns. The server cannot tell which row the client wanted."
+    label="PIR data-flow animation"
+  >
+    <svg viewBox="0 0 680 260" role="img"
+      aria-label="A query enters a database, sweeps over every row, and an opaque response returns."
+      data-anim="primer">
+      <!-- client -->
+      <rect x="12" y="100" width="96" height="60" rx="8" class="svg-dim" stroke-width="1.5"/>
+      <text x="60" y="128" text-anchor="middle" font-size="12" fill="var(--fg)" font-weight="600">Client</text>
+      <text x="60" y="146" text-anchor="middle" class="svg-label">wants row i</text>
+
+      <!-- DB rows -->
+      <g transform="translate(280,40)">
+        <text x="80" y="0" text-anchor="middle" class="svg-label">DATABASE</text>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <g class="row" data-row={i} transform={`translate(0,${12 + i * 22})`}>
+            <rect x="0" y="0" width="160" height="18" rx="4" class="svg-bg"
+              stroke="var(--border)" stroke-width="1"/>
+            <text x="8" y="13" font-size="10" class="svg-label">row {i}</text>
+            <rect x="60" y="4" width="90" height="10" rx="2"
+              fill="var(--fg-muted)" opacity="0.35"/>
+          </g>
+        ))}
+      </g>
+
+      <!-- server -->
+      <rect x="560" y="100" width="96" height="60" rx="8" class="svg-dim" stroke-width="1.5"/>
+      <text x="608" y="128" text-anchor="middle" font-size="12" fill="var(--fg)" font-weight="600">Server</text>
+      <text x="608" y="146" text-anchor="middle" class="svg-label">touches all</text>
+
+      <!-- query blob -->
+      <g class="blob blob-q">
+        <circle r="14" fill="var(--accent)" opacity="0.25"/>
+        <circle r="8" fill="var(--accent)"/>
+      </g>
+      <!-- response blob -->
+      <g class="blob blob-r">
+        <circle r="14" fill="var(--ok)" opacity="0.25"/>
+        <circle r="8" fill="var(--ok)"/>
+      </g>
+
+      <text x="340" y="235" text-anchor="middle" class="svg-label">
+        every row flashes identically — server learns nothing about i
+      </text>
+    </svg>
+  </Stage>
+
+  <p>
+    The animation above is a cartoon. Real PIR schemes achieve
+    "touches every row identically" using clever cryptography: secret-shared
+    indicator functions (DPF), homomorphic encryption (OnionPIR), or
+    preprocessed hints (HarmonyPIR). The next three sections unpack each.
+  </p>
+</Section>
+
+<style>
+  [data-anim="primer"] .blob { opacity: 0; }
+  [data-anim="primer"].play .blob-q {
+    opacity: 1;
+    animation: qmove 1.8s var(--ease) 0.2s forwards;
+  }
+  [data-anim="primer"].play .blob-r {
+    opacity: 0;
+    animation: rmove 1.8s var(--ease) 2.4s forwards;
+  }
+  [data-anim="primer"].play .row rect:last-of-type {
+    animation: flash 0.3s var(--ease) forwards;
+  }
+  [data-anim="primer"].play .row[data-row="0"] rect:last-of-type { animation-delay: 2.05s; }
+  [data-anim="primer"].play .row[data-row="1"] rect:last-of-type { animation-delay: 2.09s; }
+  [data-anim="primer"].play .row[data-row="2"] rect:last-of-type { animation-delay: 2.13s; }
+  [data-anim="primer"].play .row[data-row="3"] rect:last-of-type { animation-delay: 2.17s; }
+  [data-anim="primer"].play .row[data-row="4"] rect:last-of-type { animation-delay: 2.21s; }
+  [data-anim="primer"].play .row[data-row="5"] rect:last-of-type { animation-delay: 2.25s; }
+  [data-anim="primer"].play .row[data-row="6"] rect:last-of-type { animation-delay: 2.29s; }
+  [data-anim="primer"].play .row[data-row="7"] rect:last-of-type { animation-delay: 2.33s; }
+  @keyframes qmove {
+    0%   { transform: translate(60px, 130px); }
+    60%  { transform: translate(290px, 130px); }
+    100% { transform: translate(580px, 130px); opacity: 0.15; }
+  }
+  @keyframes rmove {
+    0%   { transform: translate(580px, 130px); opacity: 1; }
+    60%  { transform: translate(290px, 130px); opacity: 1; }
+    100% { transform: translate(60px, 130px); opacity: 0.15; }
+  }
+  @keyframes flash {
+    0%   { fill: var(--fg-muted); opacity: 0.35; }
+    50%  { fill: var(--accent); opacity: 1; }
+    100% { fill: var(--fg-muted); opacity: 0.35; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="primer"] .blob { opacity: 0.25; }
+    [data-anim="primer"] .blob-q { transform: translate(180px, 130px); }
+    [data-anim="primer"] .blob-r { transform: translate(460px, 130px); }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="primer"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

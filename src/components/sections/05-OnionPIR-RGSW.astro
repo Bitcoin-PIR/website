@@ -1,0 +1,250 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+---
+
+<Section id="onionpir-rgsw" num="05" title="OnionPIR — two ciphertext flavors">
+  <p>
+    We have a hypercube to walk. Each axis is a choice the client already
+    knows but the server must not learn. OnionPIR mixes two Ring-LWE
+    ciphertext types, picking each where it's cheapest.
+  </p>
+
+  <h3 style="margin-top: 1.25rem;">BFV — for the initial dimension</h3>
+  <p>
+    <strong>BFV</strong> is a standard leveled FHE scheme. A BFV ciphertext
+    encrypts a polynomial, and it supports cheap
+    <em>plaintext-ciphertext</em> multiplications — the plaintext stays in
+    the clear, the ciphertext stays encrypted, and noise grows only a little.
+    For the initial dimension, the server has an
+    <code>N<sub>0</sub></code>-long vector of BFV selectors
+    (all <code>Enc(0)</code>s except one <code>Enc(1)</code> at position
+    <code>i<sub>0</sub></code>) and computes a dot product against each
+    <code>N<sub>0</sub></code>-wide slab of the plaintext database. That's
+    just one plaintext-ciphertext multiply per database entry — the
+    bottleneck, but cheap per row.
+  </p>
+
+  <h3>RGSW — for every remaining dimension</h3>
+  <p>
+    <strong>RGSW</strong> is a bulkier ciphertext type. It stores
+    multiple rows of Ring-LWE encryptions of the same bit, arranged so that
+    a special product operator becomes available: the
+    <em>external product</em>. The external product multiplies a BFV
+    ciphertext by an RGSW ciphertext and returns a BFV ciphertext. Crucially,
+    <strong>its noise grows additively, not multiplicatively</strong>:
+  </p>
+  <pre><code>noise(BFV × RGSW) ≈ noise(BFV) + small_constant</code></pre>
+  <p>
+    Compare that to a naive ciphertext-ciphertext multiplication, where
+    noise roughly multiplies. After three or four multiplicative growth
+    steps the ciphertext would decode to garbage. With additive growth, the
+    server can chain ~20 external products in a row and the result still
+    decrypts cleanly. That's what makes many-dimensional hypercube
+    traversal practical at all.
+  </p>
+
+  <Stage
+    caption="For each binary dimension, fold two halves x, y using a single RGSW(b). Every fold adds only a small constant to the noise budget."
+    label="External-product fold"
+  >
+    <svg viewBox="0 0 680 380" role="img"
+      aria-label="Two BFV ciphertexts x and y combine with an RGSW(b) via x + RGSW(b)(y-x). Noise grows additively; many folds fit under the budget."
+      data-anim="onion-fold">
+
+      <defs>
+        <marker id="fold-arr" viewBox="0 0 6 6" refX="5" refY="3"
+          markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 6 3 L 0 6 z" fill="var(--fg-muted)"/>
+        </marker>
+      </defs>
+
+      <!-- Heading -->
+      <text x="20" y="22" font-size="11" font-weight="700" fill="var(--fg)">
+        One fold step:
+        <tspan font-family="ui-monospace, monospace" fill="var(--accent)">x</tspan>
+        <tspan> + </tspan>
+        <tspan font-family="ui-monospace, monospace" fill="#e8a33c">RGSW(b)</tspan>
+        <tspan> · (</tspan>
+        <tspan font-family="ui-monospace, monospace" fill="var(--accent)">y</tspan>
+        <tspan> − </tspan>
+        <tspan font-family="ui-monospace, monospace" fill="var(--accent)">x</tspan>
+        <tspan>) </tspan>
+      </text>
+
+      <!-- Two BFV inputs x and y -->
+      <g transform="translate(20,60)" class="step step-in">
+        <rect width="110" height="40" rx="5" fill="var(--accent)" opacity="0.85" stroke="var(--accent)"/>
+        <text x="55" y="18" text-anchor="middle" font-size="10"
+          font-family="ui-monospace, monospace" fill="#0a0b0f" font-weight="700">
+          BFV(x)
+        </text>
+        <text x="55" y="32" text-anchor="middle" font-size="9" fill="#0a0b0f">top half</text>
+      </g>
+      <g transform="translate(20,114)" class="step step-in">
+        <rect width="110" height="40" rx="5" fill="var(--accent)" opacity="0.85" stroke="var(--accent)"/>
+        <text x="55" y="18" text-anchor="middle" font-size="10"
+          font-family="ui-monospace, monospace" fill="#0a0b0f" font-weight="700">
+          BFV(y)
+        </text>
+        <text x="55" y="32" text-anchor="middle" font-size="9" fill="#0a0b0f">bottom half</text>
+      </g>
+
+      <!-- y - x (cheap BFV subtraction) -->
+      <path d="M 130 134 C 160 134, 170 100, 180 100" class="step step-diff arrow"
+        stroke="var(--fg-muted)" stroke-width="1" fill="none"
+        stroke-dasharray="3 3" marker-end="url(#fold-arr)"/>
+      <path d="M 130 80 L 180 80" class="step step-diff arrow"
+        stroke="var(--fg-muted)" stroke-width="1" fill="none"
+        stroke-dasharray="3 3" marker-end="url(#fold-arr)"/>
+      <g transform="translate(186,66)" class="step step-diff">
+        <rect width="110" height="40" rx="5" fill="var(--accent)" opacity="0.55" stroke="var(--accent)"/>
+        <text x="55" y="18" text-anchor="middle" font-size="10"
+          font-family="ui-monospace, monospace" fill="#0a0b0f" font-weight="700">
+          BFV(y − x)
+        </text>
+        <text x="55" y="32" text-anchor="middle" font-size="9" fill="#0a0b0f">
+          subtract, cheap
+        </text>
+      </g>
+
+      <!-- RGSW(b) -->
+      <g transform="translate(186,130)" class="step step-rgsw">
+        <rect width="110" height="40" rx="5" fill="#e8a33c" opacity="0.85" stroke="#c98728"/>
+        <text x="55" y="18" text-anchor="middle" font-size="10"
+          font-family="ui-monospace, monospace" fill="#0a0b0f" font-weight="700">
+          RGSW(b)
+        </text>
+        <text x="55" y="32" text-anchor="middle" font-size="9" fill="#0a0b0f">
+          0 or 1, encrypted
+        </text>
+      </g>
+
+      <!-- External product -->
+      <path d="M 300 86 L 360 106" class="step step-ext arrow"
+        stroke="var(--fg-muted)" stroke-width="1" fill="none"
+        stroke-dasharray="3 3" marker-end="url(#fold-arr)"/>
+      <path d="M 300 150 L 360 128" class="step step-ext arrow"
+        stroke="var(--fg-muted)" stroke-width="1" fill="none"
+        stroke-dasharray="3 3" marker-end="url(#fold-arr)"/>
+      <g transform="translate(360,96)" class="step step-ext">
+        <rect width="140" height="40" rx="5" fill="var(--accent)" opacity="0.7" stroke="var(--accent)"/>
+        <text x="70" y="18" text-anchor="middle" font-size="10"
+          font-family="ui-monospace, monospace" fill="#0a0b0f" font-weight="700">
+          ExternalProduct
+        </text>
+        <text x="70" y="32" text-anchor="middle" font-size="9" fill="#0a0b0f">
+          BFV × RGSW → BFV
+        </text>
+      </g>
+
+      <!-- Add x back -->
+      <path d="M 500 116 L 538 116" class="step step-out arrow"
+        stroke="var(--fg-muted)" stroke-width="1" fill="none"
+        stroke-dasharray="3 3" marker-end="url(#fold-arr)"/>
+      <g transform="translate(540,96)" class="step step-out">
+        <rect width="120" height="40" rx="5" fill="var(--ok)" opacity="0.25" stroke="var(--ok)"/>
+        <text x="60" y="18" text-anchor="middle" font-size="10"
+          font-family="ui-monospace, monospace" fill="var(--ok)" font-weight="700">
+          BFV(x + b(y−x))
+        </text>
+        <text x="60" y="32" text-anchor="middle" font-size="9" fill="var(--ok)">
+          = x if b=0, y if b=1
+        </text>
+      </g>
+
+      <!-- Noise budget visualization -->
+      <text x="20" y="208" font-size="11" font-weight="700" fill="var(--fg)">
+        Noise budget across many folds
+      </text>
+
+      <!-- External product noise bar (additive) -->
+      <text x="20" y="232" font-size="10" class="svg-label" fill="var(--ok)" font-weight="600">
+        external product (additive growth)
+      </text>
+      <g transform="translate(20,238)">
+        <rect width="640" height="12" rx="2" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <rect class="noise-ext" width="0" height="12" rx="2" fill="var(--ok)" opacity="0.85"/>
+      </g>
+      <text x="20" y="266" font-size="9" class="svg-label" fill="var(--fg-muted)" font-style="italic">
+        ~20 folds use a small fraction of the budget — still decrypts cleanly.
+      </text>
+
+      <!-- Naive mult noise bar (multiplicative) -->
+      <text x="20" y="298" font-size="10" class="svg-label" font-weight="600"
+        fill="#e14a5a">
+        naive ct × ct (multiplicative growth)
+      </text>
+      <g transform="translate(20,304)">
+        <rect width="640" height="12" rx="2" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <rect class="noise-mult" width="0" height="12" rx="2" fill="#e14a5a" opacity="0.85"/>
+      </g>
+      <text x="20" y="332" font-size="9" class="svg-label" fill="var(--fg-muted)" font-style="italic">
+        Noise blows past the budget after only a few folds — decryption fails.
+      </text>
+
+      <text x="340" y="364" text-anchor="middle" font-size="10"
+        class="svg-label" fill="var(--fg-muted)" font-style="italic">
+        That's the whole reason OnionPIR can afford many-dimensional hypercubes.
+      </text>
+    </svg>
+  </Stage>
+
+  <p>
+    So the protocol shape is now: initial dimension collapses with
+    plaintext-ciphertext multiplies against a BFV selector vector; every
+    subsequent dimension collapses with one external product against a
+    single RGSW ciphertext. What we haven't dealt with yet is how the
+    client ships all those selectors without sending megabytes of
+    ciphertext. That's the next page.
+  </p>
+</Section>
+
+<style>
+  [data-anim="onion-fold"] .step { opacity: 0; }
+
+  [data-anim="onion-fold"].play .step-in {
+    animation: fold-in 0.4s var(--ease) 0.2s forwards;
+  }
+  [data-anim="onion-fold"].play .step-diff {
+    animation: fold-in 0.4s var(--ease) 0.9s forwards;
+  }
+  [data-anim="onion-fold"].play .step-rgsw {
+    animation: fold-in 0.4s var(--ease) 1.4s forwards;
+  }
+  [data-anim="onion-fold"].play .step-ext {
+    animation: fold-in 0.5s var(--ease) 1.9s forwards;
+  }
+  [data-anim="onion-fold"].play .step-out {
+    animation: fold-in 0.5s var(--ease) 2.6s forwards;
+  }
+  [data-anim="onion-fold"].play .noise-ext {
+    animation: noise-grow-ext 2.4s var(--ease) 3.0s forwards;
+  }
+  [data-anim="onion-fold"].play .noise-mult {
+    animation: noise-grow-mult 1.6s var(--ease) 3.0s forwards;
+  }
+
+  @keyframes fold-in { to { opacity: 1; } }
+  @keyframes noise-grow-ext { to { width: 96px; } }
+  @keyframes noise-grow-mult { to { width: 640px; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="onion-fold"] .step { opacity: 1 !important; }
+    [data-anim="onion-fold"] .noise-ext { width: 96px !important; }
+    [data-anim="onion-fold"] .noise-mult { width: 640px !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="onion-fold"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

@@ -1,0 +1,56 @@
+---
+import Main from "~/layouts/Main.astro";
+import Pager from "~/components/Pager.astro";
+import { sections, findPage } from "~/data/sections";
+
+export function getStaticPaths() {
+  return sections.map((s) => ({
+    params: { slug: s.slug },
+    props: { sectionSlug: s.slug },
+  }));
+}
+
+const { sectionSlug } = Astro.props;
+const ref = findPage(sectionSlug)!;
+const { section, page } = ref;
+const Component = page.component;
+const base = import.meta.env.BASE_URL;
+const multiPage = section.pages.length > 1;
+---
+
+<Main
+  title={`${section.num} · ${multiPage ? `${section.title} — ${page.title}` : section.title} — BitcoinPIR`}
+  description={page.blurb ?? section.blurb}
+>
+  <div class="breadcrumbs">
+    <div class="container">
+      <a href={base}>Contents</a>
+      <span aria-hidden="true">/</span>
+      {
+        multiPage ? (
+          <>
+            <span class="breadcrumbs__section">
+              <span class="breadcrumbs__num">{section.num}</span>
+              {section.title}
+            </span>
+            <span aria-hidden="true">/</span>
+            <span class="breadcrumbs__current">{page.title}</span>
+          </>
+        ) : (
+          <span class="breadcrumbs__current">
+            <span class="breadcrumbs__num">{section.num}</span>
+            {section.title}
+          </span>
+        )
+      }
+    </div>
+  </div>
+
+  <article>
+    <Component />
+  </article>
+
+  <div class="container">
+    <Pager sectionSlug={sectionSlug} />
+  </div>
+</Main>

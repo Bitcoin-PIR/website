@@ -1,0 +1,149 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+---
+
+<Section id="problem" num="01" title="The problem">
+  <p>
+    A Bitcoin wallet wants to ask a server: <em>"Do I own any UTXOs under
+    scripthash&nbsp;X?"</em>  A naive request writes X in the clear. The server
+    — or anyone who can see the traffic — learns every address you care about.
+  </p>
+  <p>
+    The only other option is to download the whole UTXO set yourself and check
+    locally. That's &gt;&nbsp;10&nbsp;GB and growing, and it ships every
+    ratchet of other people's addresses to your device just so you can check
+    your own. <strong>Private Information Retrieval (PIR)</strong> sits
+    between these two extremes: the server answers the question without ever
+    learning which question you asked.
+  </p>
+
+  <Stage
+    caption="Left: naive wallet leaks the scripthash. Right: PIR wallet sends an opaque query blob."
+    label="Naive request versus PIR request"
+  >
+    <svg
+      viewBox="0 0 680 260"
+      role="img"
+      aria-label="Diagram comparing a naive request (scripthash visible) with a PIR request (opaque blob)"
+      data-anim="problem"
+    >
+      <defs>
+        <marker id="arr-accent" viewBox="0 0 10 10" refX="8" refY="5"
+          markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <!-- Left panel: naive -->
+      <g transform="translate(0,0)">
+        <text x="80" y="22" class="svg-label" fill="var(--danger)">NAIVE</text>
+        <rect x="14" y="40" width="120" height="58" rx="8"
+          class="svg-dim" stroke-width="1.5"/>
+        <text x="74" y="66" text-anchor="middle" fill="var(--fg)"
+          font-size="12" font-weight="600">Wallet</text>
+        <text x="74" y="84" text-anchor="middle" class="svg-label">Alice</text>
+        <rect x="196" y="40" width="120" height="58" rx="8"
+          class="svg-dim" stroke-width="1.5"/>
+        <text x="256" y="66" text-anchor="middle" fill="var(--fg)"
+          font-size="12" font-weight="600">Server</text>
+        <text x="256" y="84" text-anchor="middle" class="svg-label">UTXO DB</text>
+
+        <path d="M 138 69 L 192 69" stroke="var(--danger)" stroke-width="1.5"
+          fill="none" marker-end="url(#arr-accent)" color="var(--danger)"
+          stroke-dasharray="5 4" class="pkt-path"/>
+        <g class="pkt pkt-naive">
+          <rect x="140" y="56" width="52" height="26" rx="5"
+            fill="var(--danger)" opacity="0.18" stroke="var(--danger)"/>
+          <text x="166" y="72" text-anchor="middle" font-size="9"
+            font-family="ui-monospace, monospace" fill="var(--danger)">sh=76a9…ab</text>
+        </g>
+        <text x="166" y="120" text-anchor="middle" class="svg-label"
+          fill="var(--danger)">scripthash visible</text>
+
+        <g transform="translate(0,150)" opacity="0.9">
+          <text x="14" y="16" class="svg-label">Server learns:</text>
+          <text x="14" y="34" font-size="12" fill="var(--fg)">→ Alice's address</text>
+          <text x="14" y="52" font-size="12" fill="var(--fg)">→ her balance</text>
+          <text x="14" y="70" font-size="12" fill="var(--fg)">→ her activity</text>
+        </g>
+      </g>
+
+      <line x1="340" y1="20" x2="340" y2="240" stroke="var(--border)"
+        stroke-dasharray="3 4"/>
+
+      <!-- Right panel: PIR -->
+      <g transform="translate(360,0)">
+        <text x="80" y="22" class="svg-label" fill="var(--ok)">PIR</text>
+        <rect x="14" y="40" width="120" height="58" rx="8"
+          class="svg-dim" stroke-width="1.5"/>
+        <text x="74" y="66" text-anchor="middle" fill="var(--fg)"
+          font-size="12" font-weight="600">Wallet</text>
+        <text x="74" y="84" text-anchor="middle" class="svg-label">Alice</text>
+        <rect x="196" y="40" width="120" height="58" rx="8"
+          class="svg-dim" stroke-width="1.5"/>
+        <text x="256" y="66" text-anchor="middle" fill="var(--fg)"
+          font-size="12" font-weight="600">Server</text>
+        <text x="256" y="84" text-anchor="middle" class="svg-label">UTXO DB</text>
+
+        <path d="M 138 69 L 192 69" stroke="var(--ok)" stroke-width="1.5"
+          fill="none" marker-end="url(#arr-accent)" color="var(--ok)"
+          class="pkt-path"/>
+        <g class="pkt pkt-pir">
+          <rect x="140" y="56" width="52" height="26" rx="5"
+            fill="var(--ok)" opacity="0.15" stroke="var(--ok)"/>
+          <text x="166" y="72" text-anchor="middle" font-size="9"
+            font-family="ui-monospace, monospace" fill="var(--ok)">██ ██ ██</text>
+        </g>
+        <text x="166" y="120" text-anchor="middle" class="svg-label"
+          fill="var(--ok)">opaque DPF / FHE blob</text>
+
+        <g transform="translate(0,150)" opacity="0.9">
+          <text x="14" y="16" class="svg-label">Server learns:</text>
+          <text x="14" y="34" font-size="12" fill="var(--fg)">→ a query occurred</text>
+          <text x="14" y="52" font-size="12" fill="var(--fg)">→ <em>nothing</em> about which row</text>
+          <text x="14" y="70" font-size="12" fill="var(--fg)">→ <em>nothing</em> about Alice</text>
+        </g>
+      </g>
+    </svg>
+  </Stage>
+
+  <p>
+    <strong>What PIR guarantees:</strong> the server processes your query
+    without learning which entry in the database you read. <strong>What it
+    costs:</strong> the server must touch <em>every</em> row — privacy comes
+    from making every query look identical. BitcoinPIR is about making that
+    cost acceptable for real wallets on real devices.
+  </p>
+</Section>
+
+<style>
+  .pkt-naive, .pkt-pir { opacity: 0; transform-origin: 140px 69px; }
+  [data-anim="problem"].play .pkt-naive {
+    animation: slide 2.4s var(--ease) 0.2s both;
+  }
+  [data-anim="problem"].play .pkt-pir {
+    animation: slide 2.4s var(--ease) 0.6s both;
+  }
+  @keyframes slide {
+    0%   { opacity: 0; transform: translateX(0); }
+    15%  { opacity: 1; }
+    80%  { opacity: 1; transform: translateX(28px); }
+    100% { opacity: 0.4; transform: translateX(28px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pkt-naive, .pkt-pir { opacity: 1 !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="problem"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

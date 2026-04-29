@@ -1,0 +1,87 @@
+---
+import Main from "~/layouts/Main.astro";
+import { sections, allPages } from "~/data/sections";
+
+const base = import.meta.env.BASE_URL;
+const totalPages = allPages.length;
+---
+
+<Main
+  title="BitcoinPIR · An illustrated guide"
+  description="An illustrated, source-grounded guide to the BitcoinPIR protocol: query padding, cuckoo hashing, and Merkle-verified private queries for Bitcoin wallets."
+>
+  <section class="hero">
+    <div class="container">
+      <span class="hero__eyebrow">BitcoinPIR · v0</span>
+      <h1>Private wallet queries, explained from the ground up.</h1>
+      <p class="hero__lede">
+        BitcoinPIR lets a Bitcoin wallet ask <em>"do I own UTXOs under this
+        scripthash?"</em> without revealing the scripthash. This guide walks
+        through the protocol's moving parts — padding, cuckoo hashing, and
+        Merkle-verified "not found" proofs — with a small animation for
+        each. Every claim is grounded in the project's source code.
+      </p>
+      <div class="hero__ctas">
+        <a class="btn btn--primary" href={`${base}${sections[0]!.slug}/`}>
+          Start reading →
+        </a>
+        <a
+          class="btn btn--ghost"
+          href="https://github.com/BitcoinPIR/BitcoinPIR"
+          rel="noopener"
+        >
+          View source
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="sections" aria-label="Table of contents">
+    <div class="container">
+      <h2 style="letter-spacing: -0.02em;">Contents</h2>
+      <p class="prose" style="color: var(--fg-muted); max-width: 60ch;">
+        {sections.length} sections, {totalPages} short pages total — a handful
+        of sections span several pages. Start at the top; each page
+        introduces one idea and hands off to the next. Use
+        <span class="kbd">←</span> <span class="kbd">→</span> to move between
+        pages once you're inside.
+      </p>
+      <nav class="toc">
+        {
+          sections.map((item) => {
+            const multi = item.pages.length > 1;
+            return (
+              <div class={`toc__item${multi ? " toc__item--multi" : ""}`}>
+                <a class="toc__main" href={`${base}${item.slug}/`}>
+                  <span class="toc__num">{item.num}</span>
+                  <span class="toc__title">{item.title}</span>
+                  <span class="toc__blurb">{item.blurb}</span>
+                </a>
+                {multi && (
+                  <ol class="toc__pages">
+                    {item.pages.map((p, i) => (
+                      <li>
+                        <a
+                          href={
+                            i === 0
+                              ? `${base}${item.slug}/`
+                              : `${base}${item.slug}/${p.slug}/`
+                          }
+                        >
+                          <span class="toc__pages__num">
+                            {item.num}.{i + 1}
+                          </span>
+                          <span>{p.title}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            );
+          })
+        }
+      </nav>
+    </div>
+  </section>
+</Main>

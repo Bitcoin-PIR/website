@@ -1,0 +1,207 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+
+// 4×4 grid standing in for an N₀=4, 2×2 hypercube.
+// Target idx=6 → (i₀=2, b₁=0, b₂=1) in row-major flattening.
+const cols = 4;
+const rows = 4;
+const targetCol = 2;
+const targetRow = 1;
+const cellW = 52;
+const cellH = 34;
+const gap = 8;
+const gridX = 150;
+const gridY = 80;
+---
+
+<Section id="onionpir-hypercube" num="05" title="OnionPIR — the hypercube">
+  <p>
+    <strong>OnionPIR</strong> is a single-server PIR scheme built on
+    lattice-based homomorphic encryption. The textbook construction of
+    homomorphic PIR — encrypt a one-hot selector vector
+    <code>(Enc(0), …, Enc(1), …)</code> and let the server compute the
+    inner product against the database — works in principle, but doesn't
+    scale: the request grows linearly with the database. OnionPIR takes a
+    different route, built around three ideas explored over the next three
+    pages: reshape the database as a hypercube, mix two ciphertext
+    flavors to walk it efficiently, and pack the whole query into a single
+    ciphertext.
+  </p>
+  <p>
+    <strong>Reshape the database as a hypercube</strong> of shape
+    <code>N<sub>0</sub> × 2 × 2 × … × 2</code>. The paper's standard setup
+    uses <code>N<sub>0</sub> = 512</code> for the initial dimension, then
+    <code>log<sub>2</sub>(N/N<sub>0</sub>)</code> binary dimensions (~11 of
+    them for a 1 M-entry database). An index
+    <code>idx</code> becomes a tuple
+    <code>(i<sub>0</sub>, b<sub>1</sub>, …, b<sub>d−1</sub>)</code>:
+    the initial dimension picks one of <code>N<sub>0</sub></code> columns,
+    and each binary dimension is a single bit choosing top or bottom half of
+    the remaining cube.
+  </p>
+  <p>
+    That's the whole data-structuring move. The server walks the hypercube
+    one axis at a time, collapsing it by one dimension at each step. The
+    animation below shows the traversal as pure index arithmetic — no
+    cryptography yet. The next page introduces the two ciphertext flavors
+    that let the server do exactly this walk under encryption, without
+    learning which column or which half was chosen.
+  </p>
+
+  <Stage
+    caption="Index 6 decomposes into (i₀=2, b₁=0, b₂=1). The initial dim picks a column; each binary dim picks top or bottom half."
+    label="Hypercube index traversal (plaintext)"
+  >
+    <svg viewBox="0 0 680 320" role="img"
+      aria-label="A 4 by 4 grid representing an N0=4, 2×2 hypercube. Target index 6 is reached by picking column 2, then the top half, then the second row."
+      data-anim="onion-cube">
+
+      <!-- Grid label -->
+      <text x={gridX + cols * (cellW + gap) / 2 - gap / 2} y={gridY - 42}
+        text-anchor="middle" class="svg-label" font-size="11" font-weight="600"
+        fill="var(--fg)">
+        Database reshaped: 4 × 2 × 2 hypercube
+      </text>
+      <text x={gridX + cols * (cellW + gap) / 2 - gap / 2} y={gridY - 26}
+        text-anchor="middle" class="svg-label" font-size="10">
+        (the paper uses N₀ = 512 and ~11 binary dims; here, N₀ = 4, 2 binary dims)
+      </text>
+
+      <!-- 4×4 grid -->
+      {Array.from({ length: rows }).map((_, r) =>
+        Array.from({ length: cols }).map((__, c) => {
+          const x = gridX + c * (cellW + gap);
+          const y = gridY + r * (cellH + gap);
+          const inCol = c === targetCol;
+          const inHalf = r < 2;
+          const isTarget = inCol && r === targetRow;
+          const classes = [
+            "cube-cell",
+            inCol ? "col-sel" : "",
+            inCol && inHalf ? "half-sel" : "",
+            isTarget ? "final" : "",
+          ].filter(Boolean).join(" ");
+          return (
+            <g class={classes}>
+              <rect x={x} y={y} width={cellW} height={cellH} rx="4"
+                class="cube-rect" fill="var(--bg-elev-2)"
+                stroke="var(--border-strong)" stroke-width="1"/>
+              <text x={x + cellW / 2} y={y + cellH / 2 + 4}
+                text-anchor="middle" font-size="11" class="svg-label"
+                font-family="ui-monospace, monospace">
+                {r * cols + c}
+              </text>
+            </g>
+          );
+        })
+      )}
+
+      <!-- Axis labels -->
+      <text x={gridX - 12} y={gridY + rows * (cellH + gap) / 2}
+        text-anchor="end" class="svg-label" font-size="10">
+        dims 1–2 ↕
+      </text>
+      <text x={gridX + cols * (cellW + gap) / 2 - gap / 2}
+        y={gridY + rows * (cellH + gap) + 16}
+        text-anchor="middle" class="svg-label" font-size="10">
+        dim 0 (initial) →
+      </text>
+
+      <!-- Tuple builder on right -->
+      <g transform="translate(440,90)">
+        <text x="0" y="0" class="svg-label" font-size="11" font-weight="600"
+          fill="var(--fg)">idx = 6</text>
+        <text x="0" y="18" class="svg-label" font-size="10">
+          ↓ decompose into tuple
+        </text>
+        <g transform="translate(0,36)" class="tup tup-a">
+          <rect width="180" height="22" rx="4" fill="var(--accent)" opacity="0.2" stroke="var(--accent)"/>
+          <text x="90" y="15" text-anchor="middle" font-size="10"
+            font-family="ui-monospace, monospace" fill="var(--accent)" font-weight="700">
+            i₀ = 2  (pick column)
+          </text>
+        </g>
+        <g transform="translate(0,66)" class="tup tup-b">
+          <rect width="180" height="22" rx="4" fill="#e8a33c" opacity="0.25" stroke="#e8a33c"/>
+          <text x="90" y="15" text-anchor="middle" font-size="10"
+            font-family="ui-monospace, monospace" fill="#e8a33c" font-weight="700">
+            b₁ = 0  (top half)
+          </text>
+        </g>
+        <g transform="translate(0,96)" class="tup tup-c">
+          <rect width="180" height="22" rx="4" fill="#e8a33c" opacity="0.25" stroke="#e8a33c"/>
+          <text x="90" y="15" text-anchor="middle" font-size="10"
+            font-family="ui-monospace, monospace" fill="#e8a33c" font-weight="700">
+            b₂ = 1  (bottom of that half)
+          </text>
+        </g>
+        <g transform="translate(0,130)" class="tup tup-d">
+          <rect width="180" height="22" rx="4" fill="var(--ok)" opacity="0.2" stroke="var(--ok)"/>
+          <text x="90" y="15" text-anchor="middle" font-size="10"
+            font-family="ui-monospace, monospace" fill="var(--ok)" font-weight="700">
+            → entry at (2, 0, 1)
+          </text>
+        </g>
+      </g>
+    </svg>
+  </Stage>
+</Section>
+
+<style>
+  [data-anim="onion-cube"] .tup { opacity: 0; }
+  [data-anim="onion-cube"] .cube-cell { transition: opacity 0.4s; }
+
+  [data-anim="onion-cube"].play .cube-cell:not(.col-sel) {
+    animation: cube-dim 0.5s var(--ease) 1.0s forwards;
+  }
+  [data-anim="onion-cube"].play .tup-a {
+    animation: cube-in 0.4s var(--ease) 1.0s forwards;
+  }
+
+  [data-anim="onion-cube"].play .col-sel:not(.half-sel) {
+    animation: cube-dim 0.5s var(--ease) 2.0s forwards;
+  }
+  [data-anim="onion-cube"].play .tup-b {
+    animation: cube-in 0.4s var(--ease) 2.0s forwards;
+  }
+
+  [data-anim="onion-cube"].play .half-sel:not(.final) {
+    animation: cube-dim 0.5s var(--ease) 3.0s forwards;
+  }
+  [data-anim="onion-cube"].play .tup-c {
+    animation: cube-in 0.4s var(--ease) 3.0s forwards;
+  }
+
+  [data-anim="onion-cube"].play .final .cube-rect {
+    animation: cube-glow 0.6s var(--ease) 3.4s forwards;
+  }
+  [data-anim="onion-cube"].play .tup-d {
+    animation: cube-in 0.5s var(--ease) 3.8s forwards;
+  }
+
+  @keyframes cube-in { to { opacity: 1; } }
+  @keyframes cube-dim { to { opacity: 0.15; } }
+  @keyframes cube-glow { to { fill: var(--ok); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="onion-cube"] .tup { opacity: 1 !important; }
+    [data-anim="onion-cube"] .cube-cell:not(.col-sel) { opacity: 0.15 !important; }
+    [data-anim="onion-cube"] .col-sel:not(.half-sel) { opacity: 0.15 !important; }
+    [data-anim="onion-cube"] .half-sel:not(.final) { opacity: 0.15 !important; }
+    [data-anim="onion-cube"] .final .cube-rect { fill: var(--ok) !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="onion-cube"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

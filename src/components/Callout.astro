@@ -1,0 +1,18 @@
+---
+interface Props {
+  label?: string;
+  kind?: "info" | "danger" | "ok";
+}
+const { label = "Note", kind = "info" } = Astro.props;
+const cls =
+  kind === "danger"
+    ? "callout callout--danger"
+    : kind === "ok"
+    ? "callout callout--ok"
+    : "callout";
+---
+
+<aside class={cls} role="note">
+  <div class="callout__label">{label}</div>
+  <slot />
+</aside>

@@ -1,0 +1,262 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+
+// Tree topology for the DPF-evaluation animation.
+const alpha = 5;
+const nodes = [
+  { id: "r",  x: 340, y:  90 },
+  { id: "a",  x: 220, y: 140 },
+  { id: "b",  x: 460, y: 140 },
+  { id: "00", x: 160, y: 190 },
+  { id: "01", x: 280, y: 190 },
+  { id: "10", x: 400, y: 190 },
+  { id: "11", x: 520, y: 190 },
+  { id: "l0", x: 130, y: 240 },
+  { id: "l1", x: 190, y: 240 },
+  { id: "l2", x: 250, y: 240 },
+  { id: "l3", x: 310, y: 240 },
+  { id: "l4", x: 370, y: 240 },
+  { id: "l5", x: 430, y: 240 },
+  { id: "l6", x: 490, y: 240 },
+  { id: "l7", x: 550, y: 240 },
+];
+const pos: Record<string, { x: number; y: number }> = {};
+nodes.forEach((n) => {
+  pos[n.id] = { x: n.x, y: n.y };
+});
+const edges: [string, string][] = [
+  ["r", "a"], ["r", "b"],
+  ["a", "00"], ["a", "01"], ["b", "10"], ["b", "11"],
+  ["00", "l0"], ["00", "l1"], ["01", "l2"], ["01", "l3"],
+  ["10", "l4"], ["10", "l5"], ["11", "l6"], ["11", "l7"],
+];
+const leafLabels = ["000", "001", "010", "011", "100", "101", "110", "111"];
+const leafXs = leafLabels.map((_, i) => pos[`l${i}`]!.x);
+const alphaPos = pos[`l${alpha}`]!;
+
+// Two illustrative evaluation traces. Pick any pseudorandom pattern for A;
+// then B differs from A exactly at position α=5, so A ⊕ B is the indicator.
+const bitsA = [1, 0, 1, 0, 0, 1, 1, 0];
+const bitsB = bitsA.map((v, i) => (i === alpha ? 1 - v : v));
+const bitsX = bitsA.map((v, i) => v ^ bitsB[i]!);
+
+// Row coordinates.
+const rowLabelX = 16;
+const rowAy = 290;
+const rowBy = 324;
+const rowXy = 368;
+---
+
+<Section id="dpf" num="04" title="DPF-PIR — two servers, one XOR">
+  <p>
+    A <strong>Distributed Point Function</strong> is a pair of short keys
+    <code>k<sub>0</sub></code>, <code>k<sub>1</sub></code> with a special
+    property. You can evaluate either key at any index <code>i</code> and
+    get a pseudorandom bit. But for one specific index <code>α</code> — the
+    "point" the two keys were built around — the two outputs are rigged so
+    that:
+  </p>
+  <pre><code>Eval(k0, i) XOR Eval(k1, i)  =  1 if i = α,  0 otherwise</code></pre>
+  <p>
+    Here's the trick that makes DPF feel magical. Take a single key and
+    evaluate it at all 8 indices — you get something that looks like a
+    coin-flip sequence. Take the <em>other</em> key and do the same —
+    another coin-flip sequence. Neither row, on its own, tells you anything
+    about <code>α</code>. Only when you XOR the two rows does a single
+    <code>1</code> bit pop out at <code>α</code>, with everything else
+    cancelling to <code>0</code>.
+  </p>
+
+  <Stage
+    caption="Each server's evaluation looks random on its own. Only the XOR of both rows reveals α."
+    label="DPF tree traversal and per-key evaluation bits"
+  >
+    <svg viewBox="0 0 680 400" role="img"
+      aria-label="A binary tree of DPF evaluations. Server A's bit row and Server B's bit row each look random; their XOR has a single 1 at α."
+      data-anim="dpf">
+      <g transform="translate(20,20)">
+        <rect width="14" height="14" rx="3" fill="var(--accent)"/>
+        <text x="20" y="12" class="svg-label" fill="var(--accent)">Server A  k₀</text>
+      </g>
+      <g transform="translate(20,42)">
+        <rect width="14" height="14" rx="3" fill="var(--link)"/>
+        <text x="20" y="12" class="svg-label" fill="var(--link)">Server B  k₁</text>
+      </g>
+
+      {edges.map(([a, b]) => (
+        <line x1={pos[a]!.x} y1={pos[a]!.y + 8}
+          x2={pos[b]!.x} y2={pos[b]!.y - 8}
+          stroke="var(--border-strong)" stroke-width="1" />
+      ))}
+      {nodes.map((n, i) => (
+        <g transform={`translate(${n.x},${n.y})`}>
+          <circle r="9" class="svg-bg" stroke="var(--border-strong)" stroke-width="1"/>
+          <circle r="4" cx="-5" fill="var(--accent)" opacity="0"
+            class="a-dot" style={`--d:${0.06 * i}s`}/>
+          <circle r="4" cx="5" fill="var(--link)" opacity="0"
+            class="b-dot" style={`--d:${0.06 * i}s`}/>
+        </g>
+      ))}
+      {leafLabels.map((lbl, i) => (
+        <text x={pos[`l${i}`]!.x} y={pos[`l${i}`]!.y + 24}
+          text-anchor="middle" font-size="9" class="svg-label"
+          font-family="ui-monospace, monospace">{lbl}</text>
+      ))}
+      <g transform={`translate(${alphaPos.x},${alphaPos.y})`}>
+        <circle r="14" fill="none" stroke="var(--ok)" stroke-width="1.5"
+          stroke-dasharray="3 3" class="alpha-ring"/>
+        <text x="0" y="-22" text-anchor="middle" font-size="10"
+          fill="var(--ok)" font-weight="600">α</text>
+      </g>
+
+      {/* Row A — Server A's evaluation at each leaf (looks random) */}
+      <g class="bit-row row-a">
+        <text x={rowLabelX} y={rowAy - 6} class="svg-label" fill="var(--accent)">
+          Eval(k₀, i):
+        </text>
+        <text x={rowLabelX + 92} y={rowAy - 6} font-size="10"
+          fill="var(--fg-muted)" font-style="italic">
+          ← looks random
+        </text>
+        {bitsA.map((b, i) => (
+          <g transform={`translate(${leafXs[i]! - 10},${rowAy})`} class="cell">
+            <rect width="20" height="14" rx="2"
+              fill={b === 1 ? "var(--accent)" : "var(--bg-elev-2)"}
+              stroke={b === 1 ? "var(--accent)" : "var(--border-strong)"}/>
+            <text x="10" y="10" text-anchor="middle" font-size="9"
+              font-family="ui-monospace, monospace"
+              font-weight="600"
+              fill={b === 1 ? "#0a0b0f" : "var(--fg-muted)"}>{b}</text>
+          </g>
+        ))}
+      </g>
+
+      {/* Row B — Server B's evaluation (also looks random) */}
+      <g class="bit-row row-b">
+        <text x={rowLabelX} y={rowBy - 6} class="svg-label" fill="var(--link)">
+          Eval(k₁, i):
+        </text>
+        <text x={rowLabelX + 92} y={rowBy - 6} font-size="10"
+          fill="var(--fg-muted)" font-style="italic">
+          ← also random
+        </text>
+        {bitsB.map((b, i) => (
+          <g transform={`translate(${leafXs[i]! - 10},${rowBy})`} class="cell">
+            <rect width="20" height="14" rx="2"
+              fill={b === 1 ? "var(--link)" : "var(--bg-elev-2)"}
+              stroke={b === 1 ? "var(--link)" : "var(--border-strong)"}/>
+            <text x="10" y="10" text-anchor="middle" font-size="9"
+              font-family="ui-monospace, monospace"
+              font-weight="600"
+              fill={b === 1 ? "#0a0b0f" : "var(--fg-muted)"}>{b}</text>
+          </g>
+        ))}
+      </g>
+
+      {/* Divider + XOR row — the indicator reveals itself */}
+      <line x1={rowLabelX} y1={rowXy - 16} x2={660} y2={rowXy - 16}
+        stroke="var(--border-strong)" stroke-width="1"/>
+      <g class="bit-row row-x">
+        <text x={rowLabelX} y={rowXy - 6} class="svg-label" fill="var(--ok)"
+          font-weight="700">
+          k₀ ⊕ k₁:
+        </text>
+        <text x={rowLabelX + 92} y={rowXy - 6} font-size="10"
+          fill="var(--fg-muted)" font-style="italic">
+          ← a single 1 at α — the indicator
+        </text>
+        {bitsX.map((b, i) => (
+          <g transform={`translate(${leafXs[i]! - 10},${rowXy})`} class="cell">
+            <rect width="20" height="14" rx="2"
+              fill={b === 1 ? "var(--ok)" : "var(--bg-elev-2)"}
+              stroke={b === 1 ? "var(--ok)" : "var(--border-strong)"}
+              stroke-width={b === 1 ? 1.4 : 1}/>
+            <text x="10" y="10" text-anchor="middle" font-size="9"
+              font-family="ui-monospace, monospace"
+              font-weight="700"
+              fill={b === 1 ? "#0a0b0f" : "var(--fg-muted)"}>{b}</text>
+          </g>
+        ))}
+      </g>
+    </svg>
+  </Stage>
+
+  <p>
+    The two servers never learn <code>α</code> on their own — each sees only
+    a pseudorandom-looking bit pattern like the ones above.
+    <em>Both</em> would have to collude and XOR their keys to recover α;
+    that's the trust assumption DPF-PIR is built on.
+  </p>
+  <p>
+    To turn this into a PIR query, the servers don't just <em>output</em>
+    their evaluation bits — they use them as a mask. Each server computes
+    <code>∑<sub>i</sub> Eval(k, i) · DB[i]</code> (XOR each row where its
+    bit is 1 into an accumulator) and returns the single accumulated value.
+    The client XORs the two accumulators; every row except row&nbsp;α is
+    XORed an even number of times and cancels.
+    <strong>Only the target row survives.</strong>
+  </p>
+</Section>
+
+<style>
+  [data-anim="dpf"] .a-dot, [data-anim="dpf"] .b-dot {
+    transform-origin: center;
+  }
+  [data-anim="dpf"].play .a-dot {
+    animation: pop 0.3s var(--ease) var(--d, 0s) both;
+  }
+  [data-anim="dpf"].play .b-dot {
+    animation: pop 0.3s var(--ease) calc(var(--d, 0s) + 0.04s) both;
+  }
+  [data-anim="dpf"].play .alpha-ring {
+    animation: ring 0.8s var(--ease) 1.2s both;
+  }
+  [data-anim="dpf"] .bit-row { opacity: 0; transform: translateY(6px); }
+  [data-anim="dpf"].play .row-a {
+    animation: rowin 0.45s var(--ease) 1.6s forwards;
+  }
+  [data-anim="dpf"].play .row-b {
+    animation: rowin 0.45s var(--ease) 2.2s forwards;
+  }
+  [data-anim="dpf"].play .row-x {
+    animation: rowin 0.6s var(--ease) 3.0s forwards;
+  }
+  [data-anim="dpf"].play .row-x .cell:nth-of-type(6) rect {
+    animation: pulse 0.9s var(--ease) 3.4s 2;
+  }
+  @keyframes pop {
+    0%   { opacity: 0; transform: scale(0.4); }
+    50%  { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0.85; transform: scale(1); }
+  }
+  @keyframes ring {
+    0%   { opacity: 0; transform: scale(0.5); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes rowin {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.18); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="dpf"] .a-dot, [data-anim="dpf"] .b-dot { opacity: 0.85 !important; }
+    [data-anim="dpf"] .alpha-ring { opacity: 1 !important; }
+    [data-anim="dpf"] .bit-row { opacity: 1 !important; transform: none !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="dpf"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

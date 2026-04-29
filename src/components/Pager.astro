@@ -1,0 +1,85 @@
+---
+import { pageNeighbors } from "~/data/sections";
+
+interface Props {
+  sectionSlug: string;
+  pageSlug?: string;
+}
+const { sectionSlug, pageSlug } = Astro.props;
+const { prev, next, index, total } = pageNeighbors(sectionSlug, pageSlug);
+const base = import.meta.env.BASE_URL;
+const progress = Math.round(((index + 1) / total) * 100);
+
+function displayTitle(ref: NonNullable<typeof prev>) {
+  return ref.section.pages.length > 1 ? ref.page.title : ref.section.title;
+}
+
+function kicker(ref: NonNullable<typeof prev>, direction: "prev" | "next") {
+  const arrow = direction === "prev" ? "←" : "→";
+  const label = direction === "prev" ? "Previous" : "Next";
+  const num =
+    ref.section.pages.length > 1
+      ? `${ref.section.num}.${ref.pageIndex + 1}`
+      : ref.section.num;
+  return direction === "prev"
+    ? `${arrow} ${num} · ${label}`
+    : `${num} · ${label} ${arrow}`;
+}
+
+const prevHref = prev ? `${base}${prev.path}` : null;
+const nextHref = next ? `${base}${next.path}` : null;
+---
+
+<nav class="pager" aria-label="Section navigation">
+  <div class="pager__progress" aria-hidden="true">
+    <div class="pager__progress-bar" style={`--p:${progress}%`}></div>
+    <span class="pager__progress-label">
+      {index + 1} <span style="color:var(--fg-dim)"> / </span> {total}
+    </span>
+  </div>
+  <div class="pager__grid">
+    {
+      prev && prevHref ? (
+        <a class="pager__link pager__link--prev" href={prevHref} rel="prev">
+          <span class="pager__kicker">{kicker(prev, "prev")}</span>
+          <span class="pager__title">{displayTitle(prev)}</span>
+        </a>
+      ) : (
+        <a class="pager__link pager__link--prev" href={base} rel="prev">
+          <span class="pager__kicker">← Contents</span>
+          <span class="pager__title">Back to the table of contents</span>
+        </a>
+      )
+    }
+    {
+      next && nextHref ? (
+        <a class="pager__link pager__link--next" href={nextHref} rel="next">
+          <span class="pager__kicker">{kicker(next, "next")}</span>
+          <span class="pager__title">{displayTitle(next)}</span>
+        </a>
+      ) : (
+        <a class="pager__link pager__link--next" href={base} rel="next">
+          <span class="pager__kicker">Contents →</span>
+          <span class="pager__title">Back to the table of contents</span>
+        </a>
+      )
+    }
+  </div>
+</nav>
+
+<script is:inline define:vars={{ prevHref, nextHref }}>
+  // Keyboard navigation: ← / → move between pages. Skip when the user is
+  // typing in a field or holding a modifier.
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    const tag = t && t.tagName ? t.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (t && t.isContentEditable) return;
+    if (e.key === "ArrowLeft" && prevHref) {
+      window.location.href = prevHref;
+    } else if (e.key === "ArrowRight" && nextHref) {
+      window.location.href = nextHref;
+    }
+  });
+</script>

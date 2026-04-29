@@ -1,0 +1,146 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="padding" num="08" title="Query padding — the privacy linchpin">
+  <p>
+    Suppose Alice has 3 real scripthashes to look up in this round. Each one
+    lands in a (different) PBC group out of <code>K = 75</code>. A naive
+    client would send 3 queries — one per real item, none for the other 72
+    groups. A server watching the wire would learn that Alice's 3 items live
+    in <em>those specific</em> 3 groups. Across enough rounds, this leaks
+    information about which groups — and which address patterns — she cares
+    about.
+  </p>
+
+  <p>
+    BitcoinPIR forbids that. In every round, the client sends <em>exactly</em>
+    <code>K = 75</code> INDEX queries, <em>exactly</em> <code>K_CHUNK = 80</code>
+    CHUNK queries, and <em>exactly</em> one Merkle-sibling query per tree
+    level being verified. Real queries go into their computed PBC groups;
+    every empty group gets a <strong>dummy query with a random DPF key</strong>.
+    From the server's point of view, the traffic is identical for any number
+    of real queries from 0 up to the batch limit.
+  </p>
+
+  <pre><code>{`// pir-sdk-client/src/dpf.rs:199 — INDEX padding loop
+for b in 0..k {
+    for h in 0..INDEX_CUCKOO_NUM_HASHES {
+        let alpha = if b == assigned_group {
+            my_locs[h]                          // real query
+        } else {
+            rng.next_u64() % bins as u64        // dummy random alpha
+        };
+        let (k0, k1) = dpf.gen(alpha, dpf_n);
+        s0_group.push(k0.to_bytes());
+        s1_group.push(k1.to_bytes());
+    }
+}`}</code></pre>
+
+  <Stage
+    caption="Left: server sees 3 real queries and can pinpoint the active groups. Right: server sees 75 indistinguishable queries — real and dummy are the same wire bytes."
+    label="Unpadded versus padded queries"
+  >
+    <svg viewBox="0 0 680 260" role="img"
+      aria-label="Side-by-side: unpadded query reveals which groups hold real items; padded query makes every group indistinguishable."
+      data-anim="padding">
+      <!-- unpadded -->
+      <g transform="translate(0,10)">
+        <text x="150" y="16" text-anchor="middle" class="svg-label"
+          fill="var(--danger)">UNPADDED — 3 real queries</text>
+        {Array.from({ length: 75 }).map((_, i) => {
+          const real = i === 12 || i === 34 || i === 57;
+          const col = i % 15;
+          const row = Math.floor(i / 15);
+          return (
+            <rect x={8 + col * 19} y={30 + row * 22} width="15" height="15"
+              rx="2"
+              fill={real ? "var(--danger)" : "transparent"}
+              stroke={real ? "var(--danger)" : "var(--border)"}
+              stroke-width="1"/>
+          );
+        })}
+        <text x="150" y="190" text-anchor="middle" font-size="10"
+          class="svg-label" fill="var(--danger)">
+          server: "groups 12, 34, 57 are active"
+        </text>
+      </g>
+
+      <line x1="340" y1="10" x2="340" y2="240" stroke="var(--border)"
+        stroke-dasharray="3 4"/>
+
+      <!-- padded -->
+      <g transform="translate(360,10)">
+        <text x="150" y="16" text-anchor="middle" class="svg-label"
+          fill="var(--ok)">PADDED — 75 queries, all look alike</text>
+        {Array.from({ length: 75 }).map((_, i) => {
+          const real = i === 12 || i === 34 || i === 57;
+          const col = i % 15;
+          const row = Math.floor(i / 15);
+          return (
+            <g class={real ? "pcell pcell-real" : "pcell pcell-dummy"}>
+              <rect x={8 + col * 19} y={30 + row * 22} width="15" height="15"
+                rx="2" fill="var(--ok)" stroke="var(--ok)" stroke-width="1"
+                opacity={real ? 1 : 0.55}/>
+            </g>
+          );
+        })}
+        <text x="150" y="190" text-anchor="middle" font-size="10"
+          class="svg-label" fill="var(--ok)">
+          server: "something happened in every group, somewhere"
+        </text>
+      </g>
+    </svg>
+  </Stage>
+
+  <Callout label="Not optional" kind="danger">
+    <p>
+      Padding <em>looks</em> wasteful — you generate and transmit 72 extra
+      DPF keys for no "useful" data — but those 72 dummies are what make the
+      3 real queries private. If you drop them, the server can count real
+      queries and correlate them across rounds. <strong>Padding is the
+      privacy. It is not a performance bug to be optimized away.</strong>
+      The same rule applies to CHUNK (<code>K_CHUNK = 80</code>) and Merkle
+      rounds.
+    </p>
+  </Callout>
+</Section>
+
+<style>
+  [data-anim="padding"] .pcell { opacity: 0; }
+  [data-anim="padding"].play .pcell-real {
+    animation: dummyin 0.01s linear 0.2s forwards;
+  }
+  @keyframes dummyin {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="padding"] .pcell { opacity: 1 !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="padding"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const cells = svg.querySelectorAll(".pcell-dummy");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
+      .matches;
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+      if (reducedMotion) return;
+      // stagger dummy cells with JS for a clean wash
+      cells.forEach((c, i) => {
+        c.style.animation = "none";
+        void c.getBoundingClientRect();
+        c.style.animation = `dummyin 0.25s var(--ease) ${0.25 + i * 0.015}s forwards`;
+      });
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

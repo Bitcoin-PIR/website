@@ -1,0 +1,164 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="cuckoo" num="07" title="Cuckoo hashing — two levels of it">
+  <p>
+    BitcoinPIR uses cuckoo hashing at <em>two</em> different levels, and they
+    do different jobs. Mixing them up will make the later sections confusing,
+    so here's the distinction up front.
+  </p>
+
+  <h3>Level 1: PBC group assignment (3 candidate groups)</h3>
+  <p>
+    Each scripthash gets mapped to
+    <strong>3 candidate PBC groups</strong> (Probabilistic Batch Code) — out
+    of <code>K=75</code> groups for the INDEX table and <code>K_CHUNK=80</code>
+    for CHUNK. This is how the database is <em>batched</em>: the server can
+    answer many parallel PIR queries in one round, as long as each real query
+    lands in a different group.
+  </p>
+  <pre><code>// pir-core/src/params.rs:89
+num_hashes: 3,    // each item → 3 candidate PBC groups</code></pre>
+
+  <h3>Level 2: In-group cuckoo table (2 hash functions)</h3>
+  <p>
+    Once an item is placed in one of its 3 candidate groups, it lives inside
+    that group's own cuckoo hash table. The <em>in-group</em> table uses
+    <strong>2 hash functions</strong> — so an item has exactly 2 possible
+    bin positions inside its group, with <code>slots_per_bin</code> slots per
+    bin (4 for INDEX, 3 for CHUNK).
+  </p>
+  <pre><code>// pir-core/src/params.rs:92
+cuckoo_num_hashes: 2,   // each item → 2 bins in its group</code></pre>
+
+  <Stage
+    caption="A scripthash derives 3 candidate PBC groups. Placement picks one; inside that group, cuckoo hashing picks one of 2 bins."
+    label="Two-level cuckoo hashing"
+  >
+    <svg viewBox="0 0 680 280" role="img"
+      aria-label="A scripthash gets mapped to 3 candidate PBC groups; within the chosen group, 2 candidate bins exist."
+      data-anim="cuckoo">
+      <!-- scripthash -->
+      <g transform="translate(14,110)">
+        <rect width="130" height="40" rx="6" class="svg-dim" stroke-width="1.5"/>
+        <text x="65" y="17" text-anchor="middle" font-size="10" class="svg-label">scripthash</text>
+        <text x="65" y="31" text-anchor="middle" font-family="ui-monospace, monospace"
+          font-size="10" fill="var(--fg)">76a9…ab</text>
+      </g>
+
+      <!-- groups -->
+      <g transform="translate(200,20)">
+        <text x="120" y="-2" text-anchor="middle" class="svg-label">PBC groups (K = 75)</text>
+        {Array.from({ length: 15 }).map((_, i) => {
+          const candidates = [3, 8, 11];
+          const isCand = candidates.includes(i);
+          return (
+            <g transform={`translate(${(i % 5) * 46}, ${Math.floor(i / 5) * 44})`}>
+              <rect x="0" y="12" width="40" height="36" rx="4"
+                class={isCand ? "svg-cand" : "svg-bg"}
+                stroke={isCand ? "var(--accent)" : "var(--border)"}
+                stroke-width={isCand ? "1.5" : "1"}/>
+              <text x="20" y="32" text-anchor="middle" font-size="9"
+                fill={isCand ? "var(--accent)" : "var(--fg-dim)"}
+                font-family="ui-monospace, monospace">g{i}</text>
+            </g>
+          );
+        })}
+        <text x="120" y="170" text-anchor="middle" class="svg-label">… and 60 more</text>
+      </g>
+
+      <!-- candidate lines -->
+      <g class="cand-line" stroke="var(--accent)" stroke-width="1.3" fill="none"
+        stroke-dasharray="4 3">
+        <line x1="146" y1="130" x2="258" y2="50" class="cl c1"/>
+        <line x1="146" y1="130" x2="386" y2="50" class="cl c2"/>
+        <line x1="146" y1="130" x2="248" y2="94" class="cl c3"/>
+      </g>
+
+      <!-- chosen group → 2 bins -->
+      <g transform="translate(480,30)">
+        <text x="80" y="-2" text-anchor="middle" class="svg-label">inside group g₈</text>
+        <rect x="0" y="10" width="170" height="110" rx="8" class="svg-dim"
+          stroke="var(--accent)" stroke-width="1.5"/>
+        <!-- bin 0 -->
+        <g transform="translate(14,30)" class="bin b0">
+          <text x="60" y="-6" text-anchor="middle" class="svg-label">bin h₀</text>
+          {Array.from({ length: 4 }).map((_, s) => (
+            <rect x={s * 29} y="0" width="26" height="22" rx="3"
+              fill={s === 2 ? "var(--accent)" : "var(--bg-elev-2)"}
+              stroke={s === 2 ? "var(--accent)" : "var(--border)"}
+              stroke-width="1"/>
+          ))}
+        </g>
+        <!-- bin 1 -->
+        <g transform="translate(14,74)" class="bin b1">
+          <text x="60" y="-6" text-anchor="middle" class="svg-label">bin h₁</text>
+          {Array.from({ length: 4 }).map((_, s) => (
+            <rect x={s * 29} y="0" width="26" height="22" rx="3"
+              fill="var(--bg-elev-2)"
+              stroke="var(--border)"
+              stroke-width="1"/>
+          ))}
+        </g>
+        <text x="85" y="148" text-anchor="middle" class="svg-label"
+          fill="var(--accent)">slot 2 of h₀ contains the item</text>
+      </g>
+
+      <!-- placement arrow -->
+      <path d="M 400 80 Q 440 80 472 80" stroke="var(--accent)"
+        stroke-width="1.5" fill="none" stroke-dasharray="5 3"
+        marker-end="url(#arrC)" class="place-arrow"/>
+      <defs>
+        <marker id="arrC" viewBox="0 0 10 10" refX="8" refY="5"
+          markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+    </svg>
+  </Stage>
+
+  <Callout label="Why 3 groups and 2 bins?">
+    <p>
+      <strong>3 candidate groups</strong> gives the build-time cuckoo
+      placement enough elbow room to spread items across groups at high load
+      without constant eviction cascades.
+      <strong>2 bins within a group</strong> is the standard 2-hash cuckoo —
+      a well-understood load-balancing primitive that keeps the in-group
+      table compact. A "not found" client has to check both bins; see
+      section&nbsp;9.
+    </p>
+  </Callout>
+</Section>
+
+<style>
+  [data-anim="cuckoo"] .svg-cand { fill: var(--accent-bg); }
+  [data-anim="cuckoo"] .cl, [data-anim="cuckoo"] .place-arrow { opacity: 0; }
+  [data-anim="cuckoo"] .bin { opacity: 0; }
+  [data-anim="cuckoo"].play .c1 { animation: fadein 0.5s var(--ease) 0.3s forwards; }
+  [data-anim="cuckoo"].play .c2 { animation: fadein 0.5s var(--ease) 0.6s forwards; }
+  [data-anim="cuckoo"].play .c3 { animation: fadein 0.5s var(--ease) 0.9s forwards; }
+  [data-anim="cuckoo"].play .place-arrow { animation: fadein 0.5s var(--ease) 1.4s forwards; }
+  [data-anim="cuckoo"].play .b0 { animation: fadein 0.5s var(--ease) 1.8s forwards; }
+  [data-anim="cuckoo"].play .b1 { animation: fadein 0.5s var(--ease) 2.1s forwards; }
+  @keyframes fadein { to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="cuckoo"] .cl, [data-anim="cuckoo"] .place-arrow,
+    [data-anim="cuckoo"] .bin { opacity: 1 !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="cuckoo"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

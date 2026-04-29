@@ -1,0 +1,148 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+---
+
+<Section id="delta" num="10" title="Delta synchronization">
+  <p>
+    A full UTXO snapshot is many gigabytes. Clients can't afford to
+    re-download one per block. BitcoinPIR servers publish a
+    <strong>snapshot chain</strong>: one large base snapshot at height
+    <code>V0</code>, then small <em>deltas</em> stacking on top.
+  </p>
+
+  <p>
+    The client tracks its own last-known version and asks the server's
+    catalog for the shortest chain of deltas that will bring it up to the
+    current tip. The SDK resolves this as a BFS on the
+    <code>(base_height → tip_height)</code> graph, and caps the chain at
+    <code>MAX_DELTA_CHAIN_LENGTH = 5</code> steps — beyond that it's cheaper
+    to just fetch a fresh snapshot.
+  </p>
+
+  <pre><code>// pir-sdk/src/sync.rs:15
+pub const MAX_DELTA_CHAIN_LENGTH: usize = 5;</code></pre>
+
+  <Stage
+    caption="A client at V0 walks a BFS-shortest chain of deltas to reach V3. Longer chains fall back to fetching the latest full snapshot."
+    label="Delta sync chain"
+  >
+    <svg viewBox="0 0 680 220" role="img"
+      aria-label="A snapshot V0 plus three small deltas merge into the current version V3."
+      data-anim="delta">
+      <defs>
+        <marker id="arrD" viewBox="0 0 10 10" refX="8" refY="5"
+          markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+      <!-- V0 -->
+      <g transform="translate(20,50)">
+        <rect width="100" height="90" rx="8" class="svg-dim" stroke-width="1.5"/>
+        <text x="50" y="22" text-anchor="middle" font-size="12" fill="var(--fg)"
+          font-weight="600">V0</text>
+        <text x="50" y="38" text-anchor="middle" class="svg-label">full snapshot</text>
+        <rect x="16" y="50" width="68" height="28" rx="3" fill="var(--fg-muted)"
+          opacity="0.35"/>
+        <text x="50" y="67" text-anchor="middle" font-size="10" fill="var(--fg)">
+          ~2 GB
+        </text>
+      </g>
+      <!-- V0 → V1 -->
+      <g class="d d1" transform="translate(150,70)">
+        <rect width="64" height="50" rx="6" fill="var(--accent-bg)"
+          stroke="var(--accent)" stroke-width="1.3"/>
+        <text x="32" y="20" text-anchor="middle" font-size="11" fill="var(--accent)"
+          font-weight="600">Δ₁</text>
+        <text x="32" y="37" text-anchor="middle" font-size="9" class="svg-label">
+          ~15 MB
+        </text>
+        <path d="M -30 25 L -2 25" stroke="var(--accent)" stroke-width="1.5"
+          marker-end="url(#arrD)" fill="none"/>
+      </g>
+      <!-- V1 → V2 -->
+      <g class="d d2" transform="translate(248,70)">
+        <rect width="64" height="50" rx="6" fill="var(--accent-bg)"
+          stroke="var(--accent)" stroke-width="1.3"/>
+        <text x="32" y="20" text-anchor="middle" font-size="11" fill="var(--accent)"
+          font-weight="600">Δ₂</text>
+        <text x="32" y="37" text-anchor="middle" font-size="9" class="svg-label">
+          ~18 MB
+        </text>
+        <path d="M -30 25 L -2 25" stroke="var(--accent)" stroke-width="1.5"
+          marker-end="url(#arrD)" fill="none"/>
+      </g>
+      <!-- V2 → V3 -->
+      <g class="d d3" transform="translate(346,70)">
+        <rect width="64" height="50" rx="6" fill="var(--accent-bg)"
+          stroke="var(--accent)" stroke-width="1.3"/>
+        <text x="32" y="20" text-anchor="middle" font-size="11" fill="var(--accent)"
+          font-weight="600">Δ₃</text>
+        <text x="32" y="37" text-anchor="middle" font-size="9" class="svg-label">
+          ~22 MB
+        </text>
+        <path d="M -30 25 L -2 25" stroke="var(--accent)" stroke-width="1.5"
+          marker-end="url(#arrD)" fill="none"/>
+      </g>
+      <!-- merge arrow -->
+      <path d="M 416 95 C 450 95, 470 95, 500 95"
+        stroke="var(--ok)" stroke-width="1.5" fill="none"
+        marker-end="url(#arrD)"/>
+      <!-- V3 -->
+      <g transform="translate(500,50)" class="v3">
+        <rect width="100" height="90" rx="8" fill="var(--accent-bg)"
+          stroke="var(--ok)" stroke-width="1.5"/>
+        <text x="50" y="22" text-anchor="middle" font-size="12" fill="var(--ok)"
+          font-weight="600">V3</text>
+        <text x="50" y="38" text-anchor="middle" class="svg-label">current tip</text>
+        <rect x="16" y="50" width="68" height="28" rx="3" fill="var(--ok)"
+          opacity="0.35"/>
+        <text x="50" y="67" text-anchor="middle" font-size="10" fill="var(--fg)">
+          merged view
+        </text>
+      </g>
+
+      <text x="340" y="200" text-anchor="middle" class="svg-label">
+        each Δ is itself PIR-queried and Merkle-verified — never downloaded whole
+      </text>
+    </svg>
+  </Stage>
+
+  <p>
+    An important subtlety: the deltas aren't applied as plain data
+    overlays. Each delta is its own PIR-queryable cuckoo dataset with its
+    own Merkle root. The client issues the same padded, Merkle-verified
+    query path against each one, then merges the results. If no delta
+    contains a hit, the client also needs Merkle-verified absence proofs
+    from <em>every</em> delta — otherwise a missing delta could hide a
+    recent spend.
+  </p>
+</Section>
+
+<style>
+  [data-anim="delta"] .d, [data-anim="delta"] .v3 { opacity: 0; }
+  [data-anim="delta"].play .d1 { animation: pop 0.5s var(--ease) 0.4s forwards; }
+  [data-anim="delta"].play .d2 { animation: pop 0.5s var(--ease) 0.9s forwards; }
+  [data-anim="delta"].play .d3 { animation: pop 0.5s var(--ease) 1.4s forwards; }
+  [data-anim="delta"].play .v3 { animation: pop 0.6s var(--ease) 2.0s forwards; }
+  @keyframes pop {
+    0%   { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="delta"] .d, [data-anim="delta"] .v3 { opacity: 1 !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="delta"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

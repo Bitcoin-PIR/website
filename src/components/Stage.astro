@@ -1,0 +1,12 @@
+---
+interface Props {
+  caption?: string;
+  label: string;
+}
+const { caption, label } = Astro.props;
+---
+
+<figure class="stage" data-stage role="figure" aria-label={label}>
+  <slot />
+  {caption && <figcaption class="stage__caption">{caption}</figcaption>}
+</figure>

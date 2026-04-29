@@ -1,0 +1,176 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+import Callout from "~/components/Callout.astro";
+
+// Topology for both side-by-side Merkle diagrams.
+const treeNodes = [
+  { id: "r",  x: 150, y:  40 },
+  { id: "a",  x: 100, y:  80 },
+  { id: "b",  x: 200, y:  80 },
+  { id: "l0", x:  70, y: 120 },
+  { id: "l1", x: 130, y: 120 },
+  { id: "l2", x: 170, y: 120 },
+  { id: "l3", x: 230, y: 120 },
+];
+const pts: Record<string, { x: number; y: number }> = {};
+treeNodes.forEach((n) => {
+  pts[n.id] = { x: n.x, y: n.y };
+});
+const treeEdges: [string, string][] = [
+  ["r", "a"], ["r", "b"],
+  ["a", "l0"], ["a", "l1"],
+  ["b", "l2"], ["b", "l3"],
+];
+
+// Inclusion side: path r → a → l1; siblings = l0, b
+const incPath = new Set(["r", "a", "l1"]);
+const incSibs = new Set(["l0", "b"]);
+
+// Exclusion side: both candidate bins l1 (h0) and l3 (h1)
+const exPath0 = new Set(["r", "a", "l1"]);
+const exPath1 = new Set(["r", "b", "l3"]);
+const isExNodeActive = (id: string) => exPath0.has(id) || exPath1.has(id);
+const isExTarget = (id: string) => id === "l1" || id === "l3";
+---
+
+<Section id="merkle" num="09" title="Merkle proofs — for inclusion AND exclusion">
+  <p>
+    A PIR response is just bytes. How does the client know the server didn't
+    lie and hand back a fake bin? BitcoinPIR publishes a
+    <strong>Merkle root</strong> over the entire cuckoo-table dataset. Every
+    response is verified against this public commitment by fetching the
+    siblings along the path from the returned bin up to the root — where
+    "the siblings" are themselves PIR-queried so the server still can't tell
+    which bin you were actually verifying.
+  </p>
+
+  <p>
+    The tree depth is <code>log₂(num_leaves)</code>. At UTXO-set scale,
+    that's around <strong>25 levels</strong> for the INDEX table — which
+    translates to 25 sibling PIR queries, one per level, all padded:
+  </p>
+
+  <pre><code>// pir-core/src/merkle.rs:165
+let depth = (num_leaves as f64).log2() as usize;</code></pre>
+
+  <h3>The "not found" case — why it's harder than "found"</h3>
+  <p>
+    Proving a scripthash <em>is</em> in the database is easy: the client
+    finds the matching tag inside the returned bin and shows the Merkle
+    path. Proving it <em>isn't</em> is trickier. An empty slot could be
+    genuinely empty — or a lying server could have quietly omitted Alice's
+    item. So the client must check
+    <strong>both in-group cuckoo positions</strong>
+    (<code>INDEX_CUCKOO_NUM_HASHES = 2</code>), Merkle-verify each bin's
+    contents against the public root, and only then conclude absence.
+  </p>
+
+  <Stage
+    caption="Inclusion: one bin found, one Merkle path. Exclusion: both candidate bins empty, both Merkle-verified — only then is 'not found' sound."
+    label="Merkle verification for inclusion and exclusion"
+  >
+    <svg viewBox="0 0 680 340" role="img"
+      aria-label="A Merkle tree shows inclusion proof for one leaf (found) and exclusion proof requiring both candidate bins verified."
+      data-anim="merkle">
+      <!-- inclusion side -->
+      <g transform="translate(0,8)">
+        <text x="150" y="14" text-anchor="middle" class="svg-label"
+          fill="var(--ok)">FOUND — verify h₀ bin</text>
+        {treeEdges.map(([u, v]) => (
+          <line x1={pts[u].x} y1={pts[u].y + 8}
+            x2={pts[v].x} y2={pts[v].y - 8}
+            stroke={incPath.has(v) ? "var(--ok)" : "var(--border-strong)"}
+            stroke-width={incPath.has(v) ? 2 : 1} />
+        ))}
+        {treeNodes.map((n) => (
+          <g transform={`translate(${n.x},${n.y})`}>
+            <circle r="11"
+              fill={incPath.has(n.id) ? "var(--ok)"
+                : incSibs.has(n.id) ? "var(--accent-bg)"
+                : "var(--bg-elev-2)"}
+              stroke={incPath.has(n.id) ? "var(--ok)"
+                : incSibs.has(n.id) ? "var(--accent)"
+                : "var(--border-strong)"}
+              stroke-width="1.3"/>
+            {n.id === "r" && (
+              <text x="0" y="-16" text-anchor="middle"
+                font-size="9" class="svg-label">root</text>
+            )}
+          </g>
+        ))}
+        <text x={pts.l1.x} y={pts.l1.y + 26}
+          text-anchor="middle" font-size="9" fill="var(--ok)"
+          font-weight="600">found</text>
+        <text x="150" y="170" text-anchor="middle" class="svg-label"
+          fill="var(--fg-muted)">one path · one proof · done</text>
+      </g>
+
+      <line x1="340" y1="10" x2="340" y2="330" stroke="var(--border)"
+        stroke-dasharray="3 4"/>
+
+      <!-- exclusion side -->
+      <g transform="translate(360,8)">
+        <text x="150" y="14" text-anchor="middle" class="svg-label"
+          fill="var(--warn)">NOT FOUND — verify h₀ AND h₁ bins</text>
+        {treeEdges.map(([u, v]) => (
+          <line x1={pts[u].x} y1={pts[u].y + 8}
+            x2={pts[v].x} y2={pts[v].y - 8}
+            stroke={isExNodeActive(v) ? "var(--warn)" : "var(--border-strong)"}
+            stroke-width={isExNodeActive(v) ? 2 : 1} />
+        ))}
+        {treeNodes.map((n) => (
+          <g transform={`translate(${n.x},${n.y})`}>
+            <circle r="11"
+              fill={isExTarget(n.id) ? "transparent"
+                : isExNodeActive(n.id) ? "var(--warn)"
+                : "var(--bg-elev-2)"}
+              stroke={isExNodeActive(n.id) ? "var(--warn)" : "var(--border-strong)"}
+              stroke-width="1.3"
+              stroke-dasharray={isExTarget(n.id) ? "3 2" : "0"}/>
+            {n.id === "r" && (
+              <text x="0" y="-16" text-anchor="middle"
+                font-size="9" class="svg-label">root</text>
+            )}
+          </g>
+        ))}
+        <text x={pts.l1.x} y={pts.l1.y + 26}
+          text-anchor="middle" font-size="9" fill="var(--warn)">h₀ empty</text>
+        <text x={pts.l3.x} y={pts.l3.y + 26}
+          text-anchor="middle" font-size="9" fill="var(--warn)">h₁ empty</text>
+        <text x="150" y="170" text-anchor="middle" class="svg-label"
+          fill="var(--fg-muted)">both paths · both proofs · <tspan font-style="italic">then</tspan> absent</text>
+      </g>
+
+      <!-- explainer band -->
+      <g transform="translate(0,210)">
+        <rect x="14" y="0" width="652" height="110" rx="8" class="svg-bg"
+          stroke="var(--border)" stroke-width="1"/>
+        <text x="28" y="22" font-size="11" fill="var(--fg)" font-weight="600">
+          The rule, in one line:
+        </text>
+        <text x="28" y="46" font-size="11" class="svg-label">
+          <tspan fill="var(--fg)" font-family="ui-monospace, monospace">INDEX_CUCKOO_NUM_HASHES = 2</tspan>
+          <tspan>  means every "not found" answer must carry 2 Merkle-verified empty bins.</tspan>
+        </text>
+        <text x="28" y="70" font-size="11" class="svg-label">
+          Verifying just one empty bin is not enough: the item could still be sitting in the other bin.
+        </text>
+        <text x="28" y="94" font-size="11" class="svg-label">
+          A lying server can't fake a bin, because the bin's hash has to match the public Merkle root.
+        </text>
+      </g>
+    </svg>
+  </Stage>
+
+  <Callout label="Exclusion proofs are why this protocol is safe to use" kind="ok">
+    <p>
+      Without the two-bin Merkle check, a server that wants to suppress
+      Alice's UTXO could simply answer "not found" and Alice's wallet would
+      trust it. With it, the server has to either (a) produce a valid
+      absence proof — which it can't, because the real bin would reveal
+      Alice's entry — or (b) forge the Merkle root, which would diverge from
+      every other client's view of the public commitment.
+    </p>
+  </Callout>
+</Section>

@@ -1,0 +1,56 @@
+---
+import Section from "~/components/Section.astro";
+---
+
+<Section id="backends" num="03" title="Three backends, same interface">
+  <p>
+    BitcoinPIR ships three interchangeable PIR backends behind a single
+    client API. Same inputs, same outputs — different assumptions about how
+    privacy is enforced and how the compute / bandwidth budget is spent.
+  </p>
+
+  <div class="grid-3">
+    <div class="backend-card">
+      <span class="backend-card__tag">2 servers</span>
+      <span class="backend-card__tag">non-colluding</span>
+      <h4>DPF-PIR</h4>
+      <p>
+        Distributed Point Functions. The client splits its query into two
+        additive shares and sends one to each server. XOR the two responses
+        on return; everything cancels except the target row. Small queries,
+        fast online round; assumes the two servers don't collude.
+      </p>
+    </div>
+    <div class="backend-card">
+      <span class="backend-card__tag">1 server</span>
+      <span class="backend-card__tag">FHE</span>
+      <h4>OnionPIR</h4>
+      <p>
+        LWE-based single-server PIR. The query is a homomorphically encrypted
+        selector; the server computes <code>sum(encrypted_selector · row)</code>
+        over the whole DB and returns an encrypted result. No non-collusion
+        assumption — at the cost of heavier compute per query.
+      </p>
+    </div>
+    <div class="backend-card">
+      <span class="backend-card__tag">1 server</span>
+      <span class="backend-card__tag">stateful</span>
+      <h4>HarmonyPIR</h4>
+      <p>
+        Single-server stateful PIR. In a one-time <em>offline</em> phase the
+        client streams the whole database and condenses it into
+        √<code>N</code>-size hints. Each <em>online</em> query is then just
+        a small batch of plain database indices whose privacy comes from a
+        private random permutation over the hints; combining the response
+        with a local hint recovers the row.
+      </p>
+    </div>
+  </div>
+
+  <p style="margin-top: 2rem;">
+    All three share the same upstream plumbing: the same cuckoo layout, the
+    same padding discipline, the same Merkle-verified responses. We'll work
+    through those shared pieces one at a time, then come back to see how they
+    snap together end-to-end.
+  </p>
+</Section>

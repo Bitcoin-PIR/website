@@ -1,0 +1,244 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+
+// Reuse the toy example from the previous page.
+const cellsBefore: (number | null)[] = [
+  3, 6, null, null,   // Segment 0 — this is the one that was just queried
+  7, null, 4, null,
+  null, 5, 0, null,
+  null, 1, null, 2,
+];
+// After relocating segment 0: its two real values (3 at cell 0, 6 at cell 1)
+// each move to a random empty cell outside segment 0. Segment 0's four cells
+// all become ⊥. The two empty slots that receive values become real.
+// Here: 3 → cell 5 (segment 1, position 1), 6 → cell 8 (segment 2, position 0).
+const cellsAfter: (number | null)[] = [
+  null, null, null, null, // Segment 0 — now all empty
+  7, 3, 4, null,          // Segment 1: 3 landed at cell 5
+  6, 5, 0, null,          // Segment 2: 6 landed at cell 8
+  null, 1, null, 2,       // Segment 3 — untouched
+];
+// Cells that received a relocated value:
+const landedCells = [5, 8];
+const T = 4;
+---
+
+<Section id="harmonypir-permutation" num="06" title="HarmonyPIR — relocation and the permutation">
+  <p>
+    The previous page left a loose thread. The query into segment
+    <code>s</code> revealed most of that segment to the server — every
+    real DB index in it except the one at the target's slot, which got
+    replaced by a random cell from outside. The target itself stays
+    hidden behind the client's hint XOR, so a single request leaks
+    nothing about what was asked for. The danger is reuse: if the client
+    later needs to fetch another index whose original home is segment
+    <code>s</code>, the protocol would have to use segment <code>s</code>
+    again, and the two requests would look nearly identical — the same
+    (T−1) real cells from segment <code>s</code>, just a different
+    position swapped out for a different outside cell. Correlating the
+    two lets the server reverse-engineer which position was "the
+    replacement" each time, pinning down the permutation. So segment
+    <code>s</code> has to retire after one use. But the DB indices it
+    held still need to be reachable — they have to be re-homed into
+    other segments.
+  </p>
+  <p>
+    Concretely: the real values in segment <code>s</code> (two in our
+    running example; in general up to <code>T</code>) each move to a
+    fresh random empty cell somewhere else in the hint row, one at a
+    time. Segment <code>s</code> becomes all <code>⊥</code>. The client
+    updates its stored parities to match — each segment that received
+    one of the moved values gets that entry XOR-ed into its parity. Once
+    the bookkeeping is done, the hint table is back to the same shape
+    it had before, only permuted differently and with fewer empty cells
+    left over.
+  </p>
+
+  <Stage
+    caption="After querying segment 0, its two real values scatter to random empty cells. Segment 0 is now all ⊥; two previously-empty cells elsewhere in the row now hold those values. Hint parities are updated accordingly."
+    label="Segment relocation"
+  >
+    <svg viewBox="0 0 680 260" role="img"
+      aria-label="Hint row before and after relocation. Segment 0's values move to random empty cells in other segments; segment 0 becomes all empty.">
+
+      <defs>
+        <marker id="rel-arr" viewBox="0 0 10 10" refX="8" refY="5"
+          markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#e8a33c"/>
+        </marker>
+      </defs>
+
+      <!-- BEFORE -->
+      <text x="20" y="22" font-size="11" font-weight="700" fill="var(--fg)">
+        Before: query just happened on segment 0
+      </text>
+      {cellsBefore.map((v, i) => {
+        const smallW = 34;
+        const smallGap = 2;
+        const x = 20 + i * (smallW + smallGap);
+        const y = 32;
+        const isReal = v !== null;
+        const inSeg0 = i < T;
+        return (
+          <g>
+            <rect x={x} y={y} width={smallW} height={26} rx="3"
+              fill={inSeg0 && isReal ? "#e8a33c"
+                : isReal ? "var(--accent-bg)"
+                : "var(--bg-elev-2)"}
+              stroke={inSeg0 && isReal ? "#c98728"
+                : isReal ? "var(--accent)"
+                : "var(--border)"}/>
+            <text x={x + smallW / 2} y={y + 17}
+              text-anchor="middle" font-size="10"
+              font-family="ui-monospace, monospace"
+              fill={inSeg0 && isReal ? "#0a0b0f"
+                : isReal ? "var(--accent)"
+                : "var(--fg-dim)"}
+              font-weight={inSeg0 && isReal ? "700" : "500"}>
+              {isReal ? v : "⊥"}
+            </text>
+          </g>
+        );
+      })}
+      {[1, 2, 3].map((k) => {
+        const x = 20 + k * T * 36 - 1;
+        return (
+          <line x1={x} y1={28} x2={x} y2={62}
+            stroke="var(--fg-muted)" stroke-width="1"/>
+        );
+      })}
+
+      <!-- Arrows showing where each segment-0 value moves -->
+      {[
+        { from: 0, to: 5 }, // 3 → cell 5
+        { from: 1, to: 8 }, // 6 → cell 8
+      ].map(({ from, to }) => {
+        const fx = 20 + from * 36 + 17;
+        const tx = 20 + to * 36 + 17;
+        const yTop = 62;
+        const yBot = 138;
+        return (
+          <path
+            d={`M ${fx} ${yTop} C ${fx} ${yTop + 30}, ${tx} ${yBot - 30}, ${tx} ${yBot}`}
+            stroke="#e8a33c" stroke-width="1" fill="none"
+            stroke-dasharray="3 3" opacity="0.6" marker-end="url(#rel-arr)"/>
+        );
+      })}
+
+      <!-- AFTER -->
+      <text x="20" y="130" font-size="11" font-weight="700" fill="var(--fg)">
+        After: segment 0 is empty, values scattered into previously-⊥ cells
+      </text>
+      {cellsAfter.map((v, i) => {
+        const smallW = 34;
+        const smallGap = 2;
+        const x = 20 + i * (smallW + smallGap);
+        const y = 140;
+        const isReal = v !== null;
+        // Highlight the cells that received a relocated value.
+        const landedIn = landedCells.includes(i);
+        return (
+          <g>
+            <rect x={x} y={y} width={smallW} height={26} rx="3"
+              fill={landedIn ? "#e8a33c"
+                : isReal ? "var(--accent-bg)"
+                : "var(--bg-elev-2)"}
+              stroke={landedIn ? "#c98728"
+                : isReal ? "var(--accent)"
+                : "var(--border)"}/>
+            <text x={x + smallW / 2} y={y + 17}
+              text-anchor="middle" font-size="10"
+              font-family="ui-monospace, monospace"
+              fill={landedIn ? "#0a0b0f"
+                : isReal ? "var(--accent)"
+                : "var(--fg-dim)"}
+              font-weight={landedIn ? "700" : "500"}>
+              {isReal ? v : "⊥"}
+            </text>
+          </g>
+        );
+      })}
+      {[1, 2, 3].map((k) => {
+        const x = 20 + k * T * 36 - 1;
+        return (
+          <line x1={x} y1={136} x2={x} y2={170}
+            stroke="var(--fg-muted)" stroke-width="1"/>
+        );
+      })}
+
+      <!-- Budget / exhaustion indicator -->
+      <text x="20" y="200" font-size="10" font-weight="700" fill="var(--fg)">
+        Empty-cell budget
+      </text>
+      <g transform="translate(20,210)">
+        <rect width="640" height="12" rx="2" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <rect width="480" height="12" rx="2" fill="var(--ok)" opacity="0.65"/>
+        <rect x="480" width="160" height="12" rx="2" fill="#e14a5a" opacity="0.35"/>
+      </g>
+      <text x="20" y="240" font-size="9" class="svg-label" fill="var(--fg-muted)" font-style="italic">
+        Each query consumes T of the empty cells in the row. After ~M/2 queries
+        they're all used up, and the offline phase has to run again against a
+        fresh permutation.
+      </text>
+    </svg>
+  </Stage>
+
+  <h3 style="margin-top: 1.5rem;">The permutation backend</h3>
+  <p>
+    A design choice in HarmonyPIR is to use <em>one</em> random
+    permutation of size <code>2N</code> for the entire hint row, rather
+    than separate per-partition shuffles. This lets the scheme plug in
+    any off-the-shelf PRP large enough to cover the domain.
+  </p>
+
+  <h3 style="margin-top: 2rem;">What BitcoinPIR actually wires in</h3>
+  <p>
+    The <code>harmonypir</code> crate keeps the permutation behind a
+    <code>Prp</code> trait and ships three backends, each with a different
+    trade. The BitcoinPIR SDK exposes the choice as a runtime flag:
+  </p>
+  <ul>
+    <li>
+      <strong>HMR12.</strong> An AES-based card-shuffle PRP with a
+      security reduction to AES; BitcoinPIR uses a tweaked variant
+      (Algorithm 5 in the HarmonyPIR paper) that cuts AES calls by ~4×
+      per evaluation via phase grouping. Pure AES, no extra dependencies,
+      compiles cleanly to WASM. ~6 µs/op native, ~14 µs/op in a browser.
+      Works at any database size. Based on Hoang, Morris &amp; Rogaway,
+      <a href="https://eprint.iacr.org/2012/338" target="_blank"
+        rel="noopener"><em>An Enciphering Scheme Based on a Card
+        Shuffle</em></a> (CRYPTO 2012) — hence the shorthand
+      <strong>HMR12</strong>.
+    </li>
+    <li>
+      <strong>FastPRP.</strong> A small-domain PRP that builds a
+      permutation cache (~60 ms at <code>N</code> ≈ 6M) and answers
+      subsequent evaluations in <code>O(√N log N)</code>; ideal for the
+      server's one-off offline hint generation over many groups at once.
+      Implements Stefanov &amp; Shi,
+      <a href="https://eprint.iacr.org/2012/254" target="_blank"
+        rel="noopener"><em>FastPRP: Fast Pseudo-Random Permutations for
+        Small Domains</em></a> (ePrint 2012/254).
+    </li>
+    <li>
+      <strong>ALF.</strong> A SIMD-accelerated format-preserving
+      encryption built on AES-NI / NEON pipelining; ~83 ns/op single,
+      ~24 ns/op batched on Apple Silicon — the fastest per-op option
+      when the hardware supports it. Requires domain ≥ 2<sup>16</sup>.
+      Based on Wang, Maximov &amp; Johansson,
+      <a href="https://eprint.iacr.org/2025/2148" target="_blank"
+        rel="noopener"><em>Introducing the ALF family: AES-NI-based
+        length- and format-preserving encryption</em></a> (ePrint
+      2025/2148).
+    </li>
+  </ul>
+  <p>
+    The BitcoinPIR deployment runs HarmonyPIR <em>per cuckoo-hash group</em>:
+    75 INDEX groups plus 80 CHUNK groups in the current parameters, each
+    with its own hint row and its own PRP instance, all under a single
+    master client key. The group structure comes from the batch-code layer
+    two sections from now — same pattern for every backend, so we'll cover
+    it once there.
+  </p>
+</Section>

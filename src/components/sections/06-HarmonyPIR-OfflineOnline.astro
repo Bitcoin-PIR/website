@@ -1,0 +1,177 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+---
+
+<Section id="harmonypir-offline-online" num="06" title="HarmonyPIR — stateful PIR against one server">
+  <p>
+    <strong>HarmonyPIR</strong> is a single-server <em>stateful</em> PIR
+    scheme. There is one honest-but-curious server holding the database,
+    and no non-collusion assumption. The scheme's leverage comes from a
+    different direction: the client is willing to do work <em>once</em>,
+    up front, to make every later query cheap.
+  </p>
+  <p>
+    The protocol splits into two phases. In the <strong>offline</strong>
+    phase, the client streams the whole database from the server once and
+    condenses it into a short list of <em>hints</em> that it keeps locally.
+    In the <strong>online</strong> phase, each query is small in both
+    directions — roughly √<code>N</code> entries in the request, √<code>N</code>
+    entries in the response — and the client recovers the target row by
+    combining the response with one of its hints. After about √<code>N</code>
+    queries the hints are used up and the offline phase has to run again.
+  </p>
+
+  <Stage
+    caption="One-time streaming pass during offline; short symmetric round-trips for every online query, each reusing the precomputed hint table."
+    label="Offline / online split"
+  >
+    <svg viewBox="0 0 680 260" role="img"
+      aria-label="A single server. Offline phase: the whole database streams down once; client builds hints. Online phase: many short query/response round-trips."
+      data-anim="harmony-split">
+
+      <defs>
+        <marker id="hs-arr" viewBox="0 0 10 10" refX="8" refY="5"
+          markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+        </marker>
+        <marker id="hs-arr-ok" viewBox="0 0 10 10" refX="8" refY="5"
+          markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ok)"/>
+        </marker>
+      </defs>
+
+      <!-- Offline phase -->
+      <g transform="translate(0,10)">
+        <text x="16" y="14" class="svg-label" fill="var(--fg-muted)">OFFLINE — once per epoch</text>
+        <rect x="14" y="30" width="100" height="56" rx="8" class="svg-dim" stroke-width="1.5"/>
+        <text x="64" y="52" text-anchor="middle" font-size="12" fill="var(--fg)" font-weight="600">Client</text>
+        <text x="64" y="68" text-anchor="middle" class="svg-label">builds hints</text>
+        <text x="64" y="81" text-anchor="middle" class="svg-label" fill="var(--accent)">O(N) in</text>
+
+        <rect x="260" y="30" width="120" height="56" rx="8" class="svg-dim" stroke-width="1.5"/>
+        <text x="320" y="52" text-anchor="middle" font-size="12" fill="var(--fg)" font-weight="600">Server</text>
+        <text x="320" y="68" text-anchor="middle" class="svg-label">streams DB</text>
+
+        <g class="bulk">
+          <path d="M 255 57 L 119 57" stroke="var(--accent)" stroke-width="3"
+            stroke-dasharray="6 3" fill="none" marker-end="url(#hs-arr)"/>
+        </g>
+        <text x="186" y="105" text-anchor="middle" class="svg-label"
+          fill="var(--accent)">full database, one pass</text>
+      </g>
+
+      <line x1="410" y1="18" x2="410" y2="240" stroke="var(--border)"
+        stroke-dasharray="3 4"/>
+
+      <!-- Online phase -->
+      <g transform="translate(420,10)">
+        <text x="4" y="14" class="svg-label" fill="var(--fg-muted)">ONLINE — every query</text>
+        <rect x="0" y="30" width="96" height="56" rx="8" class="svg-dim" stroke-width="1.5"/>
+        <text x="48" y="52" text-anchor="middle" font-size="12" fill="var(--fg)" font-weight="600">Client</text>
+        <text x="48" y="68" text-anchor="middle" class="svg-label">+ local hints</text>
+        <text x="48" y="81" text-anchor="middle" class="svg-label" fill="var(--ok)">O(√N)</text>
+
+        <rect x="152" y="30" width="104" height="56" rx="8" class="svg-dim" stroke-width="1.5"/>
+        <text x="204" y="52" text-anchor="middle" font-size="12" fill="var(--fg)" font-weight="600">Server</text>
+        <text x="204" y="68" text-anchor="middle" class="svg-label">same one</text>
+
+        <g class="ping p1">
+          <circle r="5" fill="var(--ok)"/>
+        </g>
+        <g class="ping p2">
+          <circle r="5" fill="var(--ok)"/>
+        </g>
+        <g class="ping p3">
+          <circle r="5" fill="var(--ok)"/>
+        </g>
+        <text x="128" y="105" text-anchor="middle" class="svg-label"
+          fill="var(--ok)">small, frequent — each hides q</text>
+      </g>
+
+      <!-- Budget bar underneath -->
+      <text x="20" y="150" font-size="11" font-weight="700" fill="var(--fg)">
+        Online queries per offline phase
+      </text>
+      <g transform="translate(20,160)">
+        <rect width="640" height="14" rx="2" fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <rect class="budget" width="0" height="14" rx="2" fill="var(--ok)" opacity="0.8"/>
+      </g>
+      <text x="20" y="192" font-size="9" class="svg-label" fill="var(--fg-muted)" font-style="italic">
+        After ~N/T queries, all the empty cells in the hint table are used up.
+        Rerun offline with a fresh permutation and stream the database again.
+      </text>
+      <text x="20" y="222" font-size="10" class="svg-label" fill="var(--fg-muted)">
+        The next page unpacks what the hint table actually looks like, and how
+        one online query extracts a single row out of a √N-wide batch.
+      </text>
+    </svg>
+  </Stage>
+
+  <p>
+    One subtlety worth flagging up front: the online-phase request is
+    <em>not</em> an encrypted version of the query index <code>q</code>.
+    It's a batch of √<code>N</code> plain database indices — a slice of the
+    client's private hint table — with one of them swapped for a freshly
+    sampled random index so the server can't pick out which slot the client
+    actually cares about. The server just looks up those indices and sends
+    back their values. All of the privacy comes from how the client
+    <em>chose</em> the batch, not from any cryptography on the wire. The
+    rest of this section is about that choice.
+  </p>
+</Section>
+
+<style>
+  [data-anim="harmony-split"] .bulk { opacity: 0; }
+  [data-anim="harmony-split"] .ping { opacity: 0; }
+  [data-anim="harmony-split"] .budget { opacity: 0.85; }
+
+  [data-anim="harmony-split"].play .bulk {
+    animation: hs-bulkin 1.4s var(--ease) 0.3s forwards;
+  }
+  [data-anim="harmony-split"].play .p1 {
+    animation: hs-ping 1.2s var(--ease) 1.8s forwards;
+  }
+  [data-anim="harmony-split"].play .p2 {
+    animation: hs-ping 1.2s var(--ease) 2.4s forwards;
+  }
+  [data-anim="harmony-split"].play .p3 {
+    animation: hs-ping 1.2s var(--ease) 3.0s forwards;
+  }
+  [data-anim="harmony-split"].play .budget {
+    animation: hs-budget 3.5s var(--ease) 1.8s forwards;
+  }
+
+  @keyframes hs-bulkin {
+    0%   { opacity: 0; }
+    40%  { opacity: 1; }
+    100% { opacity: 0.7; }
+  }
+  @keyframes hs-ping {
+    0%   { opacity: 0; transform: translate(48px, 57px); }
+    30%  { opacity: 1; }
+    50%  { transform: translate(204px, 57px); }
+    70%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(48px, 57px); }
+  }
+  @keyframes hs-budget { to { width: 640px; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="harmony-split"] .bulk,
+    [data-anim="harmony-split"] .ping { opacity: 0.7 !important; }
+    [data-anim="harmony-split"] .budget { width: 640px !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="harmony-split"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>

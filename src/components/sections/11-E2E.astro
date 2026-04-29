@@ -1,0 +1,184 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+---
+
+<Section id="end-to-end" num="11" title="End-to-end, one scripthash">
+  <p>
+    Here's the complete path a single query takes, stitched together. The
+    happy path has up to three PIR rounds — INDEX, CHUNK, MERKLE — each
+    padded to fixed size. Every round is padded even when there's nothing
+    to return.
+  </p>
+
+  <Stage
+    caption="A single query's trip through the protocol. Grey = padded dummies, orange = real queries, green = verified result."
+    label="End-to-end query walkthrough"
+  >
+    <svg viewBox="0 0 680 380" role="img"
+      aria-label="Step-by-step animation of a full BitcoinPIR query, from scripthash to verified result."
+      data-anim="e2e">
+      <!-- Timeline rail -->
+      <line x1="40" y1="40" x2="40" y2="360" stroke="var(--border-strong)"
+        stroke-width="2"/>
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <circle cx="40" cy={40 + i * 64} r="4.5" fill="var(--bg)"
+          stroke="var(--border-strong)" stroke-width="1.5"/>
+      ))}
+
+      <!-- 1. derive -->
+      <g class="step s1" transform="translate(64,24)">
+        <rect width="580" height="44" rx="6" class="svg-bg"
+          stroke="var(--border)" stroke-width="1"/>
+        <text x="14" y="18" font-size="10" class="svg-label" fill="var(--accent)">
+          1 · TAG &amp; GROUPS
+        </text>
+        <text x="14" y="34" font-size="11" fill="var(--fg)">
+          <tspan font-family="ui-monospace, monospace">tag = splitmix64(…, sh ⊕ tag_seed)</tspan>
+          <tspan>  ·  derive 3 PBC candidate groups  ·  pick assigned group</tspan>
+        </text>
+      </g>
+
+      <!-- 2. padded INDEX -->
+      <g class="step s2" transform="translate(64,88)">
+        <rect width="580" height="44" rx="6" class="svg-bg"
+          stroke="var(--border)" stroke-width="1"/>
+        <text x="14" y="18" font-size="10" class="svg-label" fill="var(--accent)">
+          2 · INDEX PIR · K=75 padded
+        </text>
+        {Array.from({ length: 40 }).map((_, i) => {
+          const real = i === 17;
+          return (
+            <rect x={14 + i * 14} y="26" width="10" height="12" rx="2"
+              fill={real ? "var(--accent)" : "var(--border)"}/>
+          );
+        })}
+        <text x="580" y="36" text-anchor="end" font-size="10" class="svg-label">
+          1 real · 74 dummies
+        </text>
+      </g>
+
+      <!-- 3. response + decode -->
+      <g class="step s3" transform="translate(64,152)">
+        <rect width="580" height="44" rx="6" class="svg-bg"
+          stroke="var(--border)" stroke-width="1"/>
+        <text x="14" y="18" font-size="10" class="svg-label" fill="var(--ok)">
+          3 · XOR responses · match tag in bin
+        </text>
+        <text x="14" y="34" font-size="11" fill="var(--fg)"
+          font-family="ui-monospace, monospace">
+          found → (start_chunk_id, num_chunks)
+        </text>
+      </g>
+
+      <!-- 4. optional CHUNK -->
+      <g class="step s4" transform="translate(64,216)">
+        <rect width="580" height="44" rx="6" class="svg-bg"
+          stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="14" y="18" font-size="10" class="svg-label" fill="var(--accent)">
+          4 · CHUNK PIR · K_CHUNK=80 per round (if found)
+        </text>
+        {Array.from({ length: 40 }).map((_, i) => {
+          const real = i === 7 || i === 22;
+          return (
+            <rect x={14 + i * 14} y="26" width="10" height="12" rx="2"
+              fill={real ? "var(--accent)" : "var(--border)"}/>
+          );
+        })}
+        <text x="580" y="36" text-anchor="end" font-size="10" class="svg-label">
+          N real · 80-N dummies, repeat rounds as needed
+        </text>
+      </g>
+
+      <!-- 5. optional MERKLE -->
+      <g class="step s5" transform="translate(64,280)">
+        <rect width="580" height="44" rx="6" class="svg-bg"
+          stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="14" y="18" font-size="10" class="svg-label" fill="var(--accent)">
+          5 · MERKLE sibling PIR · one padded query per level
+        </text>
+        {Array.from({ length: 25 }).map((_, i) => (
+          <rect x={14 + i * 22} y="26" width="18" height="12" rx="2"
+            fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1"/>
+        ))}
+        <text x="580" y="36" text-anchor="end" font-size="10" class="svg-label">
+          ~log₂(leaves) levels
+        </text>
+      </g>
+
+      <!-- 6. result -->
+      <g class="step s6" transform="translate(64,344)">
+        <rect width="580" height="28" rx="6" fill="var(--ok)" opacity="0.12"
+          stroke="var(--ok)" stroke-width="1.2"/>
+        <text x="14" y="18" font-size="11" fill="var(--ok)" font-weight="600">
+          ✓ verified UTXO set for scripthash X  —  server learned nothing
+        </text>
+      </g>
+    </svg>
+  </Stage>
+
+  <ol>
+    <li>
+      <strong>Tag &amp; groups.</strong> The client hashes the scripthash
+      into a short 8-byte tag and derives its 3 candidate PBC groups; a
+      deterministic rule picks one as the <em>assigned group</em>.
+    </li>
+    <li>
+      <strong>INDEX round.</strong> The client generates 75 × 2 DPF
+      keys — one real (keyed to the item's 2 in-group cuckoo bin positions)
+      and 74 random dummies — and ships them to the two servers.
+    </li>
+    <li>
+      <strong>Decode.</strong> Client XORs the two servers' responses per
+      group, scans the returned bin for the matching tag, and reads
+      <code>(start_chunk_id, num_chunks)</code>.
+    </li>
+    <li>
+      <strong>CHUNK round(s).</strong> If <code>num_chunks &gt; 0</code>, the
+      client issues CHUNK queries at <code>K_CHUNK = 80</code> per round,
+      potentially spreading many chunks across multiple rounds.
+    </li>
+    <li>
+      <strong>MERKLE round(s).</strong> For each bin returned (found or
+      empty), the client issues padded sibling-PIR queries — one per tree
+      level — to verify the bin against the published Merkle root. For a
+      "not found" answer, this must cover <em>both</em>
+      <code>INDEX_CUCKOO_NUM_HASHES = 2</code> in-group bins.
+    </li>
+    <li>
+      <strong>Result.</strong> Only now does the client report UTXOs to the
+      rest of the wallet. Every PIR-returned byte has been Merkle-verified;
+      every round looked the same on the wire regardless of whether the
+      address had one UTXO or zero.
+    </li>
+  </ol>
+</Section>
+
+<style>
+  [data-anim="e2e"] .step { opacity: 0; transform: translateX(-10px); }
+  [data-anim="e2e"].play .s1 { animation: stepin 0.45s var(--ease) 0.2s forwards; }
+  [data-anim="e2e"].play .s2 { animation: stepin 0.45s var(--ease) 0.6s forwards; }
+  [data-anim="e2e"].play .s3 { animation: stepin 0.45s var(--ease) 1.0s forwards; }
+  [data-anim="e2e"].play .s4 { animation: stepin 0.45s var(--ease) 1.4s forwards; }
+  [data-anim="e2e"].play .s5 { animation: stepin 0.45s var(--ease) 1.8s forwards; }
+  [data-anim="e2e"].play .s6 { animation: stepin 0.5s var(--ease) 2.3s forwards; }
+  @keyframes stepin {
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-anim="e2e"] .step { opacity: 1 !important; transform: translateX(0) !important; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('[data-anim="e2e"]').forEach((svg) => {
+    const stage = svg.closest("[data-stage]");
+    const run = () => {
+      svg.classList.remove("play");
+      void svg.getBoundingClientRect();
+      svg.classList.add("play");
+    };
+    stage?.addEventListener("stage:visible", run);
+    svg.addEventListener("click", run);
+  });
+</script>
