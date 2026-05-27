@@ -1,0 +1,85 @@
+---
+import Section from "~/components/Section.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="verification-scope" num="13" title="What's not in scope">
+  <p>
+    The verification covers <strong>wire shape</strong> — the lengths,
+    the round counts, the item vectors. It does not cover
+    <strong>cryptographic indistinguishability of the bytes inside
+    each fixed-length envelope</strong>. That's a different kind of
+    claim, and it's outside the verification effort by design.
+  </p>
+
+  <h3>Mechanized vs cited-by-hypothesis</h3>
+  <p>
+    The simulator-property theorem is a statement about lengths and
+    structure. It says: at every wire round, the request and response
+    sizes, and the labelled item vectors, are determined by
+    <code>L(q)</code>. Whether the <em>bytes</em> inside those
+    fixed-length buffers are indistinguishable is a separate question —
+    it depends on the security of the underlying cryptographic
+    primitives.
+  </p>
+  <p>
+    DPF keys, FHE ciphertexts, and PRP outputs are treated as
+    ideal-primitive uniform randomness in the EasyCrypt model. That
+    hypothesis is cited from the underlying primitives' papers:
+  </p>
+  <ul>
+    <li>
+      <strong>DPF</strong> security from the <code>libdpf</code>
+      construction's reduction to a length-doubling PRG.
+    </li>
+    <li>
+      <strong>OnionPIR</strong> semantic security from BFV's IND-CPA
+      argument, as instantiated in the <code>OnionPIRv2-fork</code>
+      crate.
+    </li>
+    <li>
+      <strong>HarmonyPIR</strong> PRP indistinguishability from the
+      Hoang–Morris–Rogaway / FastPRP / ALF papers, depending on which
+      backend is selected.
+    </li>
+  </ul>
+  <p>
+    Closing this gap formally — re-proving the cryptographic
+    primitives from scratch in EasyCrypt — would be a multi-year
+    research project per primitive. The verification effort
+    deliberately did not pursue it. The site's section on each
+    backend (DPF, OnionPIR, HarmonyPIR) cites the underlying papers
+    for the cryptographic claims.
+  </p>
+
+  <h3>What the claim means for users</h3>
+  <p>
+    For BitcoinPIR's actual threat model — "the server should not
+    learn which scripthash you queried, nor whether it was found, nor
+    how many UTXOs it has, nor the cuckoo position it matched at" —
+    the verification is as tight as a non-research-project codebase
+    can reasonably get.
+  </p>
+  <p>
+    Stated precisely: every wire-observable axis is either
+    structurally constant or is an explicitly declared field of
+    <code>L</code>. An adversary who records a session of BitcoinPIR
+    queries cannot use the wire shape to fingerprint the wallet's
+    behaviour, even with adversarially chosen scripthash patterns.
+    Side channels that PIR doesn't address — timing, network
+    metadata, the observation that you're using a wallet at all — are
+    listed in section 12.
+  </p>
+
+  <Callout label="Verification is a process">
+    <p>
+      The leakage record <code>L</code> reflects the codebase as of
+      the most recent closure pass. If a future change introduces a
+      new wire-observable axis, <code>L</code> grows and these pages
+      grow with it; if a previously declared axis is closed by a new
+      invariant, <code>L</code> shrinks. The point isn't that
+      verification is final — it's that the claim is precise enough
+      to update.
+    </p>
+  </Callout>
+</Section>

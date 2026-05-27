@@ -195,8 +195,9 @@ const T = 4;
   <h3 style="margin-top: 2rem;">What BitcoinPIR actually wires in</h3>
   <p>
     The <code>harmonypir</code> crate keeps the permutation behind a
-    <code>Prp</code> trait and ships three backends, each with a different
-    trade. The BitcoinPIR SDK exposes the choice as a runtime flag:
+    <code>Prp</code> trait and ships two backends, each with a different
+    trade. The BitcoinPIR SDK exposes the choice as a runtime flag,
+    with <strong>FastPRP</strong> the production default.
   </p>
   <ul>
     <li>
@@ -212,27 +213,26 @@ const T = 4;
       <strong>HMR12</strong>.
     </li>
     <li>
-      <strong>FastPRP.</strong> A small-domain PRP that builds a
-      permutation cache (~60 ms at <code>N</code> ≈ 6M) and answers
-      subsequent evaluations in <code>O(√N log N)</code>; ideal for the
-      server's one-off offline hint generation over many groups at once.
-      Implements Stefanov &amp; Shi,
+      <strong>FastPRP</strong> (default). A small-domain PRP that
+      builds a permutation cache (~60 ms at <code>N</code> ≈ 6M) and
+      answers subsequent evaluations in <code>O(√N log N)</code>; ideal
+      for the server's one-off offline hint generation over many groups
+      at once. Implements Stefanov &amp; Shi,
       <a href="https://eprint.iacr.org/2012/254" target="_blank"
         rel="noopener"><em>FastPRP: Fast Pseudo-Random Permutations for
         Small Domains</em></a> (ePrint 2012/254).
     </li>
-    <li>
-      <strong>ALF.</strong> A SIMD-accelerated format-preserving
-      encryption built on AES-NI / NEON pipelining; ~83 ns/op single,
-      ~24 ns/op batched on Apple Silicon — the fastest per-op option
-      when the hardware supports it. Requires domain ≥ 2<sup>16</sup>.
-      Based on Wang, Maximov &amp; Johansson,
-      <a href="https://eprint.iacr.org/2025/2148" target="_blank"
-        rel="noopener"><em>Introducing the ALF family: AES-NI-based
-        length- and format-preserving encryption</em></a> (ePrint
-      2025/2148).
-    </li>
   </ul>
+  <p style="font-size: 0.92rem; color: var(--fg-muted);">
+    Earlier versions of the SDK also shipped an <strong>ALF</strong>
+    backend (Wang, Maximov &amp; Johansson,
+    <a href="https://eprint.iacr.org/2025/2148" target="_blank"
+      rel="noopener"><em>Introducing the ALF family</em></a>, ePrint
+    2025/2148). ALF was retired in May 2026 because its implementation
+    panicked on domains smaller than 2<sup>16</sup>, which the
+    sibling-Merkle hint tables routinely hit. FastPRP is now the
+    default; HMR12 remains as a pure-AES alternative.
+  </p>
   <p>
     The BitcoinPIR deployment runs HarmonyPIR <em>per cuckoo-hash group</em>:
     75 INDEX groups plus 80 CHUNK groups in the current parameters, each

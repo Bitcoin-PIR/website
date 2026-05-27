@@ -84,3 +84,71 @@ If the upstream verification layer evolves:
 - Update this file's stats / claims accordingly.
 - Update site copy (likely under `src/content/` or `src/pages/`)
   with cross-references in `CONTENT-AUDIT.md`.
+
+## Site implementation status (last touched 2026-05-27)
+
+The verification/privacy material is now implemented on the site.
+Map of what exists, so a future session can resume without re-deriving:
+
+**Section 12 — "What the server learns"** (`tradeoffs`), 2 pages:
+- `12-Tradeoffs-Wire.astro` (`/tradeoffs/`) — the CANNOT/CAN-learn
+  grid, corrected so found-vs-not-found and UTXO-count are in the
+  CANNOT column (the closures made the old "Server CAN observe"
+  claims false). Forward-links to section 13.
+- `12-Tradeoffs-Beyond.astro` (`/tradeoffs/beyond-the-server/`) —
+  network observers, colluding DPF servers, compromised client state.
+
+**Section 13 — "How we verify privacy"** (`verification`), 3 pages:
+- `13-Verification-Leakage.astro` (`/verification/`) — the leakage
+  record `L(q)` (4 fields) + the byte-identity demo SVG. This is the
+  centerpiece; the animation shows two queries with equal `L`
+  producing equal wire transcripts.
+- `13-Verification-Evidence.astro` (`/verification/evidence/`) —
+  three layers: EasyCrypt (verbatim per-query theorem), Kani, live
+  byte-identity integration tests.
+- `13-Verification-Scope.astro` (`/verification/scope/`) — honest
+  scope split (wire shape mechanized; primitive indistinguishability
+  cited from papers) + "verification is a process" mutability note.
+
+**Section 06 (HarmonyPIR) gained a 4th page:**
+- `06-HarmonyPIR-EmptyCount.astro` (`/harmonypir/empty-count/`) —
+  Per-Group Request-Count Symmetry: why ⊥ slots are filled with
+  random dummies (fixed `T−1` indices/request) and XOR-cancelled
+  client-side. Impl cited at `harmonypir-wasm/src/lib.rs`
+  (`build_request_inner:1160`, `process_response:576`,
+  `build_synthetic_dummy:537`); design in
+  `PLAN_HARMONY_COUNT_LEAK_FIX.md`.
+
+**Upstream syncs already applied (BitcoinPIR commits):**
+- `c394fe1e` / `34c2bb0b`: PRP_ALF retired. HarmonyPIR permutation
+  page now lists only HMR12 + FastPRP (FastPRP default). ALF kept as
+  a one-line historical note.
+- `08d4725a` / `ccf2033a`: synthetic CHUNK padding is now
+  scripthash-seeded (`SHA-256("BPIR-CHUNK-PAD" || sh || idx)`), not
+  the literal `[0..M-1]`. Reflected in section 13.1's `L(q)` bullet.
+
+**Citation line numbers verified this session** (drift fast — re-grep
+before trusting): CLAUDE.md invariants — Per-Group Request-Count
+`121-143`, INDEX Merkle Group-Symmetry `144-194`, CHUNK Merkle
+Item-Count `196-258`. Byte-identity tests in
+`pir-sdk-client/tests/leakage_integration_test.rs` — dpf `:1349`,
+harmony `:888`, onion `:1549`; comparator `assert_profiles_equivalent:215`.
+`pad_chunk_ids_to_m` at `pir-sdk-client/src/dpf.rs:2744`.
+Note: `request_bytes`/`response_bytes` in the test framework are
+u64 byte *counts*, not raw bytes — "byte-identical" means equal
+lengths + equal structural item vectors, not equal ciphertext.
+
+**Known follow-ups (not blocking):**
+- Section 13 says "two [axes] are pinned to constants by closure
+  invariants." There are actually 5 MANDATORY-for-Privacy invariants
+  in CLAUDE.md now; the 4-field `L` is still the external claim, so
+  this was intentionally left as-is (user confirmed "leave it").
+- No animation on the empty-count page yet (worked example + callout
+  only). A two-request "different composition, identical byte count"
+  SVG could be added if it reads dense.
+- HarmonyPIR pair-query API (`build_request_pair`/`process_response_pair`,
+  1 RTT for h=0/h=1) is cited in the audit but has no site copy —
+  it's a perf optimization, not privacy.
+- Doc-only stats (415 EasyCrypt verification points, 151 Rust /
+  138 vitest tests) were deliberately NOT surfaced on the site
+  (uncorroborated outside the briefing; user wanted high-level only).

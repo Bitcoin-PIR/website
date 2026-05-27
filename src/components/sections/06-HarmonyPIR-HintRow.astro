@@ -311,10 +311,22 @@ const requestValues: (number | null)[] = [3, 0, null, null];
     online, against a total database of <code>N</code> rows.
   </p>
   <p>
-    We've glossed over one thing: after the query runs, the hint row has
-    to change — otherwise a second query into the same segment would leak.
-    The next page handles that, and the crypto choice that makes the whole
-    scheme run fast enough to matter.
+    <strong>An implementation detail.</strong> On the wire, HarmonyPIR
+    does not actually transmit the <code>⊥</code> markers shown above.
+    Sending only the non-empty slots would let the server count how
+    many cells in segment <code>s</code> are still occupied — a count
+    that drifts upward as the client consumes hints, leaking both
+    query progress and which slot is the real query each round. The
+    fix replaces every <code>⊥</code> with a freshly sampled random
+    index and XOR-cancels the dummies client-side; the
+    <em>Hiding the empty count</em> page walks through it.
+  </p>
+  <p>
+    We've also glossed over one bigger thing: after the query runs,
+    the hint row has to change — otherwise a second query into the
+    same segment would leak. The next page handles that, and the
+    crypto choice that makes the whole scheme run fast enough to
+    matter.
   </p>
 </Section>
 

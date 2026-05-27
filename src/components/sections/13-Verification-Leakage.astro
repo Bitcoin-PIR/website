@@ -1,0 +1,215 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+---
+
+<Section id="verification-leakage" num="13" title="The leakage record L(q)">
+  <p>
+    The previous section sorted what the server can and can't observe.
+    This section is about <em>how we know that list is complete</em>.
+  </p>
+  <p>
+    A BitcoinPIR client emits a sequence of wire rounds for every
+    query — request bytes out, response bytes back, repeated round by
+    round. An honest-but-curious server records the whole transcript:
+    how many rounds happened, how big each request and response was,
+    what items each request asked for. The verification effort defines
+    exactly which bits of this transcript are allowed to vary across
+    queries — that's the leakage record <code>L(q)</code> — and proves
+    that everything else is fixed by the protocol.
+  </p>
+
+  <h3>The four fields of <code>L</code></h3>
+  <p>
+    Two fields are intentional public metadata that the protocol
+    publishes as part of its API; the other two are pinned to
+    constants by closure invariants in the implementation.
+  </p>
+  <ul>
+    <li>
+      <strong><code>query_db_id</code></strong> — which database the
+      query is against (the mainnet snapshot, a particular delta
+      epoch, etc.). Intentional public metadata: choosing a DB to
+      query is a visible part of the protocol's API.
+    </li>
+    <li>
+      <strong><code>session_query_index</code></strong> — the position
+      of this query inside the HarmonyPIR session, used to schedule
+      hint refresh. Function of session length, already public.
+    </li>
+    <li>
+      <strong><code>index_max_items_per_group_per_level</code></strong>
+      — pinned to <code>2</code> by the <em>INDEX Merkle Group-Symmetry</em>
+      invariant. Multi-query batches are routed across all three
+      candidate PBC groups via <code>pbc_plan_rounds</code>, so
+      colliding scripthashes never accumulate items in a single group.
+    </li>
+    <li>
+      <strong><code>chunk_max_items_per_group_per_level</code></strong>
+      — pinned to <code>1</code> (with <code>M = 16</code> Merkle
+      items per query and <code>K_CHUNK = 80</code> PBC groups) by the
+      <em>CHUNK Merkle Item-Count Symmetry</em> invariant. Real chunk
+      IDs fill the prefix of a 16-slot buffer; per-query synthetic IDs
+      derived from
+      <code>SHA-256("BPIR-CHUNK-PAD" || scripthash || query_index)</code>
+      fill the suffix. Every query — found, not-found, whale —
+      contributes exactly 16 items, and the synthetic IDs are spread
+      uniformly over the chunk-id space so batched CHUNK rounds pack
+      densely.
+    </li>
+  </ul>
+
+  <h3>The simulator-property claim</h3>
+  <p>
+    For any backend <code>b</code> and any two queries
+    <code>q1, q2</code> with <code>L(q1) = L(q2)</code>, the wire
+    transcripts of <code>Real(b, q1)</code> and <code>Real(b, q2)</code>
+    are equal. The visualization below is what that looks like in
+    practice — a found query and a not-found query that happen to
+    share the same <code>L</code>, side by side.
+  </p>
+
+  <Stage
+    caption="Two queries with the same L produce wire transcripts that match byte-for-byte across every round. The byte-diff stays at zero, even when one query found the address and the other did not."
+    label="Byte-identity demo"
+  >
+    <svg viewBox="0 0 680 320" role="img"
+      aria-label="Top half: two L records side by side, with all four fields equal. Bottom half: two wire transcripts side by side. Identity markers between them. Aggregate byte-diff is zero."
+      data-anim="byte-identity">
+
+      <defs>
+        <marker id="vi-arr" viewBox="0 0 10 10" refX="5" refY="9"
+          markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 5 9 L 10 0 z" fill="var(--fg-muted)"/>
+        </marker>
+      </defs>
+
+      <!-- L(q1) -->
+      <g class="lrec lrec-1">
+        <text x="160" y="14" text-anchor="middle" font-size="11"
+          fill="var(--fg-muted)">L(q1) — FOUND, sh = 0xa1b2…</text>
+        <rect x="40" y="22" width="240" height="86" rx="6"
+          fill="var(--bg-elev-2)" stroke="var(--accent)"/>
+        <text x="56" y="40" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">db_id            : 0</text>
+        <text x="56" y="56" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">session_index    : 7</text>
+        <text x="56" y="72" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">index_max_items  : 2</text>
+        <text x="56" y="88" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">chunk_max_items  : 1</text>
+      </g>
+
+      <!-- L(q2) -->
+      <g class="lrec lrec-2">
+        <text x="520" y="14" text-anchor="middle" font-size="11"
+          fill="var(--fg-muted)">L(q2) — NOT-FOUND, sh = 0xc3d4…</text>
+        <rect x="400" y="22" width="240" height="86" rx="6"
+          fill="var(--bg-elev-2)" stroke="var(--accent)"/>
+        <text x="416" y="40" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">db_id            : 0</text>
+        <text x="416" y="56" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">session_index    : 7</text>
+        <text x="416" y="72" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">index_max_items  : 2</text>
+        <text x="416" y="88" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">chunk_max_items  : 1</text>
+      </g>
+
+      <!-- Equality marker between L records -->
+      <g class="leq">
+        <rect x="298" y="48" width="84" height="34" rx="6"
+          fill="var(--bg-elev-2)" stroke="var(--ok)"/>
+        <text x="340" y="64" text-anchor="middle" font-size="11"
+          font-weight="700" fill="var(--ok)">L(q1) = L(q2)</text>
+        <text x="340" y="76" text-anchor="middle" font-size="9"
+          fill="var(--fg-muted)">field-by-field</text>
+      </g>
+
+      <!-- Down arrows from L records to transcripts -->
+      <path d="M 160 110 L 160 142" stroke="var(--fg-muted)"
+        stroke-width="1" fill="none" marker-end="url(#vi-arr)"/>
+      <path d="M 520 110 L 520 142" stroke="var(--fg-muted)"
+        stroke-width="1" fill="none" marker-end="url(#vi-arr)"/>
+
+      <!-- Transcript headers -->
+      <text x="160" y="156" text-anchor="middle" font-size="10"
+        font-weight="600" fill="var(--fg)">Wire transcript</text>
+      <text x="520" y="156" text-anchor="middle" font-size="10"
+        font-weight="600" fill="var(--fg)">Wire transcript</text>
+      <text x="340" y="156" text-anchor="middle" font-size="10"
+        fill="var(--fg-muted)">byte diff</text>
+
+      <!-- Round 1: INDEX phase -->
+      <g class="trace-row tr-1">
+        <rect x="40" y="166" width="240" height="22" rx="4"
+          fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <text x="50" y="181" font-size="10"
+          font-family="ui-monospace, monospace" fill="var(--fg)">INDEX phase  · K = 75 PBC groups</text>
+        <text class="eq-mark" x="340" y="183" text-anchor="middle"
+          font-size="14" font-weight="700" fill="var(--ok)">≡</text>
+        <rect x="400" y="166" width="240" height="22" rx="4"
+          fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <text x="410" y="181" font-size="10"
+          font-family="ui-monospace, monospace" fill="var(--fg)">INDEX phase  · K = 75 PBC groups</text>
+      </g>
+
+      <!-- Round 2: CHUNK phase -->
+      <g class="trace-row tr-2">
+        <rect x="40" y="194" width="240" height="22" rx="4"
+          fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <text x="50" y="209" font-size="10"
+          font-family="ui-monospace, monospace" fill="var(--fg)">CHUNK phase  · M = 16 items (padded)</text>
+        <text class="eq-mark" x="340" y="211" text-anchor="middle"
+          font-size="14" font-weight="700" fill="var(--ok)">≡</text>
+        <rect x="400" y="194" width="240" height="22" rx="4"
+          fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <text x="410" y="209" font-size="10"
+          font-family="ui-monospace, monospace" fill="var(--fg)">CHUNK phase  · M = 16 items (padded)</text>
+      </g>
+
+      <!-- Round 3: MERKLE phase -->
+      <g class="trace-row tr-3">
+        <rect x="40" y="222" width="240" height="22" rx="4"
+          fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <text x="50" y="237" font-size="10"
+          font-family="ui-monospace, monospace" fill="var(--fg)">MERKLE phase · per-level siblings</text>
+        <text class="eq-mark" x="340" y="239" text-anchor="middle"
+          font-size="14" font-weight="700" fill="var(--ok)">≡</text>
+        <rect x="400" y="222" width="240" height="22" rx="4"
+          fill="var(--bg-elev-2)" stroke="var(--border)"/>
+        <text x="410" y="237" font-size="10"
+          font-family="ui-monospace, monospace" fill="var(--fg)">MERKLE phase · per-level siblings</text>
+      </g>
+
+      <!-- Aggregate diff bar -->
+      <g transform="translate(40,260)">
+        <rect x="0" y="0" width="600" height="32" rx="6"
+          fill="var(--bg-elev-2)" stroke="var(--ok)"/>
+        <text x="300" y="20" text-anchor="middle" font-size="12"
+          font-weight="700" fill="var(--ok)">aggregate byte-diff across full transcript: 0</text>
+      </g>
+      <text x="340" y="306" text-anchor="middle" font-size="9"
+        fill="var(--fg-muted)" font-style="italic">
+        Asserted by leakage_integration_test.rs · *_found_vs_not_found_have_byte_identical_profiles
+      </text>
+    </svg>
+  </Stage>
+
+  <p>
+    The picture answers <em>what</em> the verification claims. The
+    next page covers <em>how</em> we believe it — three layers of
+    evidence, each addressing a different way the claim could be
+    wrong.
+  </p>
+</Section>
+
+<style>
+  /* Subtle pulse on the equality markers; respects reduced-motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-anim="byte-identity"] .leq rect {
+      animation: vi-pulse 2.4s ease-in-out infinite;
+    }
+    [data-anim="byte-identity"] .eq-mark {
+      animation: vi-pulse 2.4s ease-in-out infinite;
+    }
+    [data-anim="byte-identity"] .tr-2 .eq-mark { animation-delay: 0.4s; }
+    [data-anim="byte-identity"] .tr-3 .eq-mark { animation-delay: 0.8s; }
+  }
+  @keyframes vi-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+</style>

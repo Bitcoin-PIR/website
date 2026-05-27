@@ -13,12 +13,17 @@ import OnionPack from "~/components/sections/05-OnionPIR-QueryPack.astro";
 import HarmonyOfflineOnline from "~/components/sections/06-HarmonyPIR-OfflineOnline.astro";
 import HarmonyHintRow from "~/components/sections/06-HarmonyPIR-HintRow.astro";
 import HarmonyPermutation from "~/components/sections/06-HarmonyPIR-Permutation.astro";
+import HarmonyEmptyCount from "~/components/sections/06-HarmonyPIR-EmptyCount.astro";
 import Cuckoo from "~/components/sections/07-Cuckoo.astro";
 import Padding from "~/components/sections/08-Padding.astro";
 import Merkle from "~/components/sections/09-Merkle.astro";
 import Delta from "~/components/sections/10-Delta.astro";
 import E2E from "~/components/sections/11-E2E.astro";
-import Tradeoffs from "~/components/sections/12-Tradeoffs.astro";
+import TradeoffsWire from "~/components/sections/12-Tradeoffs-Wire.astro";
+import TradeoffsBeyond from "~/components/sections/12-Tradeoffs-Beyond.astro";
+import VerificationLeakage from "~/components/sections/13-Verification-Leakage.astro";
+import VerificationEvidence from "~/components/sections/13-Verification-Evidence.astro";
+import VerificationScope from "~/components/sections/13-Verification-Scope.astro";
 
 export interface Page {
   slug: string;
@@ -114,6 +119,12 @@ export const sections: Section[] = [
         blurb: "Why segments move, and how the random permutation is chosen.",
         component: HarmonyPermutation,
       },
+      {
+        slug: "empty-count",
+        title: "Hiding the empty count",
+        blurb: "Why ⊥ slots are filled with random dummies, not sent as-is.",
+        component: HarmonyEmptyCount,
+      },
     ],
   },
   {
@@ -156,7 +167,46 @@ export const sections: Section[] = [
     slug: "tradeoffs",
     title: "What the server learns",
     blurb: "Honest list of what PIR hides and what it doesn't.",
-    pages: [{ slug: "intro", title: "Trade-offs", component: Tradeoffs }],
+    pages: [
+      {
+        slug: "wire",
+        title: "On the wire",
+        blurb: "What the server learns from the bytes themselves.",
+        component: TradeoffsWire,
+      },
+      {
+        slug: "beyond-the-server",
+        title: "Beyond the server",
+        blurb: "Adversaries PIR doesn't address on its own.",
+        component: TradeoffsBeyond,
+      },
+    ],
+  },
+  {
+    num: "13",
+    slug: "verification",
+    title: "How we verify privacy",
+    blurb: "The leakage record L(q), and the three layers that confirm it.",
+    pages: [
+      {
+        slug: "leakage",
+        title: "The leakage record L(q)",
+        blurb: "Four fields, two intentional, two pinned to constants.",
+        component: VerificationLeakage,
+      },
+      {
+        slug: "evidence",
+        title: "Three layers of evidence",
+        blurb: "EasyCrypt, Kani, and live byte-identity tests.",
+        component: VerificationEvidence,
+      },
+      {
+        slug: "scope",
+        title: "What's not in scope",
+        blurb: "Wire shape vs cryptographic indistinguishability.",
+        component: VerificationScope,
+      },
+    ],
   },
 ];
 

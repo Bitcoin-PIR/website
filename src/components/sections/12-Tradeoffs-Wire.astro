@@ -1,0 +1,80 @@
+---
+import Section from "~/components/Section.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="tradeoffs-wire" num="12" title="What the server learns — honest trade-offs">
+  <p>
+    PIR is not magic. It hides specific things and leaves other things
+    visible; pretending otherwise would be worse than not using PIR at
+    all. This page covers what an honest-but-curious server can and
+    cannot infer from the wire traffic of a BitcoinPIR query.
+  </p>
+
+  <div class="grid-2" style="margin-top: 2rem;">
+    <div class="backend-card" style="border-left: 3px solid var(--ok);">
+      <h4 style="color: var(--ok);">Server CANNOT learn</h4>
+      <ul>
+        <li>Which scripthash you queried</li>
+        <li>Which specific PBC groups contain your real query (padding hides this)</li>
+        <li>Which bin inside a group you cared about (DPF / FHE / PRP keys are opaque)</li>
+        <li>
+          <strong>Whether the address was found.</strong> Every query —
+          found, not-found, whale — emits the same number of CHUNK and
+          MERKLE rounds, with the same per-level item count.
+        </li>
+        <li>
+          <strong>How many UTXOs the address has.</strong> Real chunk
+          IDs fill the prefix of an
+          <code>M = 16</code>-slot buffer; deterministic synthetic IDs
+          fill the suffix. Every query contributes exactly 16 chunk
+          Merkle items.
+        </li>
+        <li>Whether a returned bin was tampered with (Merkle root binds the data)</li>
+      </ul>
+    </div>
+    <div class="backend-card" style="border-left: 3px solid var(--warn);">
+      <h4 style="color: var(--warn);">Server CAN observe</h4>
+      <ul>
+        <li>
+          <strong>Which database you're querying.</strong> The base
+          snapshot vs a particular delta epoch is part of the protocol's
+          public API.
+        </li>
+        <li>
+          <strong>Your position in a HarmonyPIR session.</strong> The
+          <code>session_query_index</code> sizes the hint-refresh
+          schedule; it's a function of session length and is already
+          public.
+        </li>
+        <li>
+          <strong>Timing patterns and bandwidth.</strong> Same client
+          connection, repeatable cadence. Wire bytes are constant
+          across queries, but the timing isn't.
+        </li>
+        <li>
+          <strong>That you're a wallet talking to a PIR server.</strong>
+          PIR doesn't hide network presence.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <Callout label="The visible items aren't accidental">
+    <p>
+      <code>query_db_id</code> and <code>session_query_index</code> are
+      <em>declared</em> as the only two intentional leakage channels.
+      The other two structural axes that used to leak — whether
+      chunk/Merkle rounds ran, and how many — are now pinned to
+      constants by closure invariants in the implementation. Section
+      13 walks through how we mechanized that claim.
+    </p>
+  </Callout>
+
+  <p>
+    Everything above is about a single honest-but-curious server (or a
+    pair of servers for DPF). There are adversaries PIR doesn't
+    address on its own — network observers, colluding servers,
+    compromised client state. The next page covers those.
+  </p>
+</Section>

@@ -1,0 +1,59 @@
+---
+import Section from "~/components/Section.astro";
+---
+
+<Section id="tradeoffs-beyond" num="12" title="Beyond the server">
+  <p>
+    The previous page sorted out what a single honest-but-curious
+    server learns from wire traffic. That's the threat model PIR was
+    designed for, and the part the verification effort proves. Real
+    deployments still face adversaries PIR doesn't address on its own.
+  </p>
+
+  <ul>
+    <li>
+      <strong>Network-level observers.</strong> TLS is assumed. PIR
+      doesn't hide that you're a wallet talking to a PIR server. If
+      that matters to your threat model, run your client over Tor or a
+      similar transport.
+    </li>
+    <li>
+      <strong>Colluding servers</strong> (for DPF-PIR only). DPF
+      assumes its two servers do not share keys or logs. If they do,
+      the privacy argument collapses back to the naive case. OnionPIR
+      and HarmonyPIR are single-server schemes and have no analogous
+      assumption.
+    </li>
+    <li>
+      <strong>Compromised client state.</strong> PIR doesn't help if
+      somebody reads your wallet's cache directly. For HarmonyPIR this
+      is a bit sharper: the hint table is what keeps the random
+      permutation private, so if it leaks, the server can in principle
+      correlate past queries in the current epoch.
+    </li>
+    <li>
+      <strong>Server-side bugs.</strong> A malicious or buggy server
+      that violates the protocol can return wrong answers. The
+      Merkle-binding work in section 09 protects against
+      <em>forgery</em> of returned data, but it doesn't protect against
+      a server that simply stops responding or returns nothing — that
+      shows up as a query failure, not a privacy breach, but it's
+      still an availability concern.
+    </li>
+  </ul>
+
+  <p>
+    PIR buys you a specific, narrow, useful property: the server
+    cannot learn which address you're watching, nor whether it found
+    anything. Everything else in your wallet's threat model still
+    applies.
+  </p>
+
+  <hr/>
+  <p style="color: var(--fg-muted); font-size: 0.95rem;">
+    For the formal version of the privacy claim — the leakage record
+    <code>L(q)</code>, the simulator-property theorem, and the three
+    layers of evidence (EasyCrypt, Kani, live byte-identity tests) —
+    see the next section.
+  </p>
+</Section>

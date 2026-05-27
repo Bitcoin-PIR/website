@@ -1,0 +1,166 @@
+---
+import Section from "~/components/Section.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="harmonypir-empty-count" num="06" title="Hiding the empty count">
+  <p>
+    The hint-row page showed a request of the form
+    <code>Q = [3, 0, ⊥, ⊥]</code> — four slots, with two
+    real database indices and two <code>⊥</code> markers for empty
+    cells in segment <code>s</code>. That picture is correct as the
+    <em>algorithm</em>, but it is not what actually goes on the wire.
+    The implementation replaces every <code>⊥</code> with a freshly
+    sampled random index, sends a fixed number of distinct indices
+    per request, and XOR-cancels the dummies client-side. This page
+    is about why.
+  </p>
+
+  <h3>The leak</h3>
+  <p>
+    Without padding, the request would carry only the non-empty
+    cells of segment <code>s</code>. The number of indices the
+    server receives would equal the count of non-<code>⊥</code>
+    cells in that segment. That count varies — and it varies in a
+    way the server can model.
+  </p>
+  <p>
+    Initially each segment is roughly half-full: the count of
+    real cells is Binomial(<code>T</code>, <code>½</code>) over the
+    offline phase's random permutation. But every time the client
+    runs a query, relocation moves real values into
+    previously-empty cells in other segments (covered on the
+    permutation page). The non-empty count of every still-usable
+    segment drifts <em>upward</em> with hint usage, approaching
+    <code>T − 1</code> by the time the client is near the end of
+    its query budget. Two things follow for the server.
+  </p>
+  <ul>
+    <li>
+      <strong>Hint ageing.</strong> Fitting the per-group count
+      trajectory tells the server roughly how many queries have been
+      run against each group since the last offline rehint, and when
+      a fresh offline pass is imminent.
+    </li>
+    <li>
+      <strong>Real-query identification.</strong> In a single round
+      where the client touches <code>K</code> PBC groups (one real
+      query plus <code>K − 1</code> padding queries — section 08
+      covers that), the slot whose count is drifting fastest is the
+      real-query slot. The others stay closer to the fresh
+      distribution.
+    </li>
+  </ul>
+
+  <h3>The fix</h3>
+  <p>
+    Every HarmonyPIR per-group request emits <strong>exactly
+    <code>T − 1</code> sorted distinct <code>u32</code> indices</strong>
+    drawn from <code>[0, N)</code>, regardless of segment state,
+    query count, or round.
+  </p>
+  <ol>
+    <li>
+      Read the <code>T − 1</code> cells of segment <code>s</code>
+      that exclude position <code>r</code>. Collect their values;
+      call the non-<code>⊥</code> ones <em>real</em>.
+    </li>
+    <li>
+      Sample <code>(T − 1) − |real|</code> dummy indices uniformly
+      from <code>[0, N) ∖ real</code>, using the client's secure
+      RNG. Track which sorted-merged slots are dummies in a
+      per-call <code>is_dummy</code> bit-vector.
+    </li>
+    <li>
+      Merge real + dummy indices, sort ascending, serialize as
+      <code>(T − 1) × 4</code> bytes little-endian. That is the wire.
+    </li>
+  </ol>
+  <p>
+    The server cannot tell reals from dummies — both look like
+    uniform integers in <code>[0, N)</code>, and the per-request
+    count is constant. On response, the server returns
+    <code>T − 1</code> entries in sorted-request order. The client
+    XOR-cancels the dummies:
+  </p>
+  <pre><code>answer = H[s] ⊕ XOR(entries[i] for i where !is_dummy[i])</code></pre>
+  <p>
+    Dummy entries contribute nothing to <code>answer</code>; only
+    the real-segment values do. The XOR with <code>H[s]</code>
+    isolates the target's value <code>DB[q]</code> exactly as in
+    the hint-row walkthrough.
+  </p>
+
+  <h3>A worked example</h3>
+  <p>
+    Reuse the toy from the hint-row page: <code>N = 8</code>,
+    <code>T = 4</code>, segment 0 has cells
+    <code>[3, 6, ⊥, ⊥]</code>, query <code>q = 6</code> at position
+    <code>r = 1</code>. The paper-algorithm view says the request
+    is <code>Q = [3, 0, ⊥, ⊥]</code>. The wire-level view says:
+  </p>
+  <ul>
+    <li>
+      The <code>T − 1 = 3</code> cells of segment 0 excluding
+      position 1 are cells 0, 2, 3, with values
+      <code>3, ⊥, ⊥</code>. The non-<code>⊥</code> set is
+      <code>{3}</code>.
+    </li>
+    <li>
+      Sample 2 fresh dummies from <code>[0, 8) ∖ {3}</code>. Say the
+      RNG gives <code>{5, 7}</code>. The merged set is
+      <code>{3, 5, 7}</code>.
+    </li>
+    <li>
+      Sort ascending and serialize. Wire bytes are
+      <code>[3, 5, 7]</code> as three little-endian
+      <code>u32</code>s; <code>is_dummy</code> is
+      <code>[false, true, true]</code>.
+    </li>
+    <li>
+      Server returns three entries in the same sorted order:
+      <code>R = [DB[3], DB[5], DB[7]]</code>.
+    </li>
+    <li>
+      Client XOR-cancels the dummies:
+      <code>answer = H[0] ⊕ DB[3]</code>. Since
+      <code>H[0] = DB[3] ⊕ DB[6]</code>,
+      <code>answer = DB[6]</code>. ✓
+    </li>
+  </ul>
+  <p>
+    The "replacement at position <code>r</code>" idea from the
+    paper-algorithm view collapses into "skip position
+    <code>r</code> entirely" here — the target is recovered through
+    the segment parity, not by reading its slot back. Either way the
+    server learns nothing about which cell held the target.
+  </p>
+
+  <Callout label="Why this is load-bearing for privacy">
+    <p>
+      Filtering empty cells and sending only the non-empty count is
+      the obvious-looking optimisation, and it is exactly the leak.
+      The implementation explicitly bans this: no code path may
+      emit fewer than <code>T − 1</code> indices, and no "skip if
+      empty" early-exit is permitted. Every wire request is the
+      same <code>(T − 1) × 4</code> bytes, regardless of how many
+      of segment <code>s</code>'s cells happened to be occupied
+      when the query ran.
+    </p>
+  </Callout>
+
+  <p style="margin-top: 2rem; color: var(--fg-muted); font-size: 0.95rem;">
+    The padding helper lives in
+    <code>harmonypir-wasm/src/lib.rs::HarmonyGroup::build_request_inner</code>
+    (the <code>build_request</code> wrapper preserves per-call state
+    for the XOR cancellation); response handling is in the same
+    crate's <code>process_response</code>. Cover queries against
+    groups the client doesn't need produce wire-shape-equivalent
+    requests via <code>build_synthetic_dummy</code>, which samples
+    <code>T − 1</code> random indices directly without touching
+    any segment. The design rationale is in
+    <code>PLAN_HARMONY_COUNT_LEAK_FIX.md</code> upstream and the
+    <em>HarmonyPIR Per-Group Request-Count Symmetry</em> section
+    of <code>CLAUDE.md</code>.
+  </p>
+</Section>
