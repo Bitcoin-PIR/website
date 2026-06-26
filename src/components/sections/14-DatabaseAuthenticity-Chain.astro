@@ -24,13 +24,6 @@ import Callout from "~/components/Callout.astro";
   >
     <svg viewBox="0 0 680 390" role="img"
       aria-label="A vertical chain from PIR answer to database Merkle roots, attested database build, snapshot anchor, BHTM leaf proof, BHTM tree root, SEV-SNP quote, and Bitcoin header-linked stripped-delta stream.">
-      <defs>
-        <marker id="auth-arrow" viewBox="0 0 10 10" refX="5" refY="9"
-          markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M 0 0 L 5 9 L 10 0 z" fill="var(--fg-muted)"/>
-        </marker>
-      </defs>
-
       {[
         ["1", "PIR answer", "UTXO bytes or verified absence"],
         ["2", "Database Merkle proof", "bucket/onion path to a super-root"],
@@ -46,9 +39,9 @@ import Callout from "~/components/Callout.astro";
         return (
           <g>
             {i > 0 && (
-              <path d={`M 340 ${y - 10} L 340 ${y + 2}`}
+              <line x1="340" y1={y - 10} x2="340" y2={y}
                 stroke="var(--fg-muted)" stroke-width="1.2"
-                marker-end="url(#auth-arrow)"/>
+                stroke-linecap="round"/>
             )}
             <rect x="74" y={y} width="532" height="34" rx="6"
               fill={accent ? "var(--accent-bg)" : "var(--bg-elev-2)"}
