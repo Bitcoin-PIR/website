@@ -31,22 +31,10 @@ jobs:
       - name: Check upstream audit references
         run: npm run audit:check
 
-      - name: Resolve base path
-        id: base
-        run: |
-          # For `<user>.github.io/<repo>/` deploys, Pages serves under /<repo>/.
-          # The workflow pulls the repo name out of $GITHUB_REPOSITORY.
-          repo_name="${GITHUB_REPOSITORY#*/}"
-          if [ "$repo_name" = "${GITHUB_REPOSITORY_OWNER}.github.io" ]; then
-            echo "base=/" >> "$GITHUB_OUTPUT"
-          else
-            echo "base=/$repo_name/" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build site
         env:
-          SITE_BASE: ${{ steps.base.outputs.base }}
-          SITE_URL: https://${{ github.repository_owner }}.github.io
+          SITE_BASE: /
+          SITE_URL: http://docs.bitcoinpir.org
         run: npm run build
 
       - uses: actions/configure-pages@v5

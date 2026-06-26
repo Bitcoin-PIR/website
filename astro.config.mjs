@@ -1,13 +1,13 @@
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 
-// Edit `base` if this repo is deployed at a non-root path on GitHub Pages.
-// For `https://<user>.github.io/<repo>/`, set base: "/<repo>/".
-// For a user/org page or custom domain, leave base: "/".
+// The public site is served from docs.bitcoinpir.org, so links and assets
+// should resolve from the domain root. Override these env vars only for
+// temporary previews.
 const base = process.env.SITE_BASE ?? "/";
 
 export default defineConfig({
-  site: process.env.SITE_URL ?? "https://bitcoinpir.github.io",
+  site: process.env.SITE_URL ?? "http://docs.bitcoinpir.org",
   base,
   integrations: [mdx()],
   markdown: {
