@@ -7,7 +7,7 @@ import mdx from "@astrojs/mdx";
 const base = process.env.SITE_BASE ?? "/";
 
 export default defineConfig({
-  site: process.env.SITE_URL ?? "http://docs.bitcoinpir.org",
+  site: process.env.SITE_URL ?? "https://docs.bitcoinpir.org",
   base,
   integrations: [mdx()],
   markdown: {

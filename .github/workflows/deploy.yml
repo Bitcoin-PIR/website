@@ -34,7 +34,7 @@ jobs:
       - name: Build site
         env:
           SITE_BASE: /
-          SITE_URL: http://docs.bitcoinpir.org
+          SITE_URL: https://docs.bitcoinpir.org
         run: npm run build
 
       - uses: actions/configure-pages@v5
