@@ -39,8 +39,8 @@ import Callout from "~/components/Callout.astro";
     </li>
     <li>
       <strong>HarmonyPIR</strong> PRP indistinguishability from the
-      Hoang–Morris–Rogaway / FastPRP / ALF papers, depending on which
-      backend is selected.
+      Hoang–Morris–Rogaway / FastPRP papers (FastPRP is the active
+      backend in this build).
     </li>
   </ul>
   <p>
@@ -56,19 +56,18 @@ import Callout from "~/components/Callout.astro";
   <p>
     For BitcoinPIR's actual threat model — "the server should not
     learn which scripthash you queried, nor whether it was found, nor
-    how many UTXOs it has, nor the cuckoo position it matched at" —
-    the verification is as tight as a non-research-project codebase
-    can reasonably get.
+    the cuckoo position it matched at" plus a deliberate leak of
+    approximate per-query UTXO count — the verification is as tight as
+    a non-research-project codebase can reasonably get.
   </p>
   <p>
-    Stated precisely: every wire-observable axis is either
-    structurally constant or is an explicitly declared field of
-    <code>L</code>. An adversary who records a session of BitcoinPIR
-    queries cannot use the wire shape to fingerprint the wallet's
-    behaviour, even with adversarially chosen scripthash patterns.
-    Side channels that PIR doesn't address — timing, network
-    metadata, the observation that you're using a wallet at all — are
-    listed in section 12.
+    Stated precisely: every wire-observable axis is either structurally
+    constant, explicitly admitted in <code>L</code>, or outside scope.
+    An adversary who records a session of BitcoinPIR queries cannot use
+    the wire shape to fingerprint the wallet's behavior, even with
+    adversarially chosen scripthash patterns. Side channels that PIR
+    doesn't address — timing, network metadata, the observation that
+    you're using a wallet at all — are listed in section 12.
   </p>
 
   <Callout label="Verification is a process">
@@ -76,10 +75,10 @@ import Callout from "~/components/Callout.astro";
       The leakage record <code>L</code> reflects the codebase as of
       the most recent closure pass. If a future change introduces a
       new wire-observable axis, <code>L</code> grows and these pages
-      grow with it; if a previously declared axis is closed by a new
+      grow with it; if an admitted axis is closed by a new
       invariant, <code>L</code> shrinks. The point isn't that
-      verification is final — it's that the claim is precise enough
-      to update.
+      verification is final — it's that the claim is precise enough to
+      update.
     </p>
   </Callout>
 </Section>

@@ -12,7 +12,7 @@ import Callout from "~/components/Callout.astro";
   </p>
 
   <div class="grid-2" style="margin-top: 2rem;">
-    <div class="backend-card" style="border-left: 3px solid var(--ok);">
+      <div class="backend-card" style="border-left: 3px solid var(--ok);">
       <h4 style="color: var(--ok);">Server CANNOT learn</h4>
       <ul>
         <li>Which scripthash you queried</li>
@@ -22,13 +22,6 @@ import Callout from "~/components/Callout.astro";
           <strong>Whether the address was found.</strong> Every query —
           found, not-found, whale — emits the same number of CHUNK and
           MERKLE rounds, with the same per-level item count.
-        </li>
-        <li>
-          <strong>How many UTXOs the address has.</strong> Real chunk
-          IDs fill the prefix of an
-          <code>M = 16</code>-slot buffer; deterministic synthetic IDs
-          fill the suffix. Every query contributes exactly 16 chunk
-          Merkle items.
         </li>
         <li>Whether a returned bin was tampered with (Merkle root binds the data)</li>
       </ul>
@@ -53,6 +46,13 @@ import Callout from "~/components/Callout.astro";
           across queries, but the timing isn't.
         </li>
         <li>
+          <strong>Approximate per-query UTXO count.</strong> The removed
+          M=16 CHUNK padding means the server can infer how many CHUNK
+          Merkle items each query contributes (the <code>chunk_max</code>
+          leakage axis). This was traded off as mild because ~99% of
+          addresses are single-chunk.
+        </li>
+        <li>
           <strong>That you're a wallet talking to a PIR server.</strong>
           PIR doesn't hide network presence.
         </li>
@@ -62,12 +62,13 @@ import Callout from "~/components/Callout.astro";
 
   <Callout label="The visible items aren't accidental">
     <p>
-      <code>query_db_id</code> and <code>session_query_index</code> are
-      <em>declared</em> as the only two intentional leakage channels.
-      The other two structural axes that used to leak — whether
-      chunk/Merkle rounds ran, and how many — are now pinned to
-      constants by closure invariants in the implementation. Section
-      13 walks through how we mechanized that claim.
+      <code>query_db_id</code>, <code>session_query_index</code>, and
+      <code>chunk_max_items_per_group_per_level</code> are declared
+      leakage channels. The <code>index_max_items_per_group_per_level</code>
+      axis is currently pinned to a constant by closure invariants. The
+      approximate <code>chunk_max</code> axis is intentionally admitted in
+      this release as a deliberate trade-off.
+      Section 13 walks through how we mechanized the remaining claim.
     </p>
   </Callout>
 

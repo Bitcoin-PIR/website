@@ -22,8 +22,9 @@ import Stage from "~/components/Stage.astro";
   <h3>The four fields of <code>L</code></h3>
   <p>
     Two fields are intentional public metadata that the protocol
-    publishes as part of its API; the other two are pinned to
-    constants by closure invariants in the implementation.
+    publishes as part of its API. The other two are protocol-observable
+    axes: one is pinned to a constant by closure invariant, and one is
+    an explicit documented leak introduced to keep the protocol practical.
   </p>
   <ul>
     <li>
@@ -46,16 +47,13 @@ import Stage from "~/components/Stage.astro";
     </li>
     <li>
       <strong><code>chunk_max_items_per_group_per_level</code></strong>
-      — pinned to <code>1</code> (with <code>M = 16</code> Merkle
-      items per query and <code>K_CHUNK = 80</code> PBC groups) by the
-      <em>CHUNK Merkle Item-Count Symmetry</em> invariant. Real chunk
-      IDs fill the prefix of a 16-slot buffer; per-query synthetic IDs
-      derived from
-      <code>SHA-256("BPIR-CHUNK-PAD" || scripthash || query_index)</code>
-      fill the suffix. Every query — found, not-found, whale —
-      contributes exactly 16 items, and the synthetic IDs are spread
-      uniformly over the chunk-id space so batched CHUNK rounds pack
-      densely.
+      — the approximate per-query CHUNK-Merkle item count (equivalently,
+      approximate per-query UTXO count). This was formerly fixed by
+      M-padding; the M=16 mechanism was intentionally removed in Phase
+      4 / WS-A to reduce chunk-layer overhead, so this field is now an
+      admitted leak axis. Found-vs-not-found behavior is still protected
+      via <em>CHUNK Round-Presence Symmetry</em>, which forces at least
+      one CHUNK-Merkle pass in all cases.
     </li>
   </ul>
 
@@ -65,12 +63,11 @@ import Stage from "~/components/Stage.astro";
     <code>q1, q2</code> with <code>L(q1) = L(q2)</code>, the wire
     transcripts of <code>Real(b, q1)</code> and <code>Real(b, q2)</code>
     are equal. The visualization below is what that looks like in
-    practice — a found query and a not-found query that happen to
-    share the same <code>L</code>, side by side.
+    practice — two queries with matching <code>L</code> side by side.
   </p>
 
   <Stage
-    caption="Two queries with the same L produce wire transcripts that match byte-for-byte across every round. The byte-diff stays at zero, even when one query found the address and the other did not."
+    caption="Two queries with matching L(q) values produce wire transcripts that match byte-for-byte across every round."
     label="Byte-identity demo"
   >
     <svg viewBox="0 0 680 320" role="img"
@@ -87,7 +84,7 @@ import Stage from "~/components/Stage.astro";
       <!-- L(q1) -->
       <g class="lrec lrec-1">
         <text x="160" y="14" text-anchor="middle" font-size="11"
-          fill="var(--fg-muted)">L(q1) — FOUND, sh = 0xa1b2…</text>
+          fill="var(--fg-muted)">L(q1)</text>
         <rect x="40" y="22" width="240" height="86" rx="6"
           fill="var(--bg-elev-2)" stroke="var(--accent)"/>
         <text x="56" y="40" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">db_id            : 0</text>
@@ -99,7 +96,7 @@ import Stage from "~/components/Stage.astro";
       <!-- L(q2) -->
       <g class="lrec lrec-2">
         <text x="520" y="14" text-anchor="middle" font-size="11"
-          fill="var(--fg-muted)">L(q2) — NOT-FOUND, sh = 0xc3d4…</text>
+          fill="var(--fg-muted)">L(q2)</text>
         <rect x="400" y="22" width="240" height="86" rx="6"
           fill="var(--bg-elev-2)" stroke="var(--accent)"/>
         <text x="416" y="40" font-size="10" font-family="ui-monospace, monospace" fill="var(--fg)">db_id            : 0</text>
@@ -151,13 +148,13 @@ import Stage from "~/components/Stage.astro";
         <rect x="40" y="194" width="240" height="22" rx="4"
           fill="var(--bg-elev-2)" stroke="var(--border)"/>
         <text x="50" y="209" font-size="10"
-          font-family="ui-monospace, monospace" fill="var(--fg)">CHUNK phase  · M = 16 items (padded)</text>
+          font-family="ui-monospace, monospace" fill="var(--fg)">CHUNK phase  · variable item count</text>
         <text class="eq-mark" x="340" y="211" text-anchor="middle"
           font-size="14" font-weight="700" fill="var(--ok)">≡</text>
         <rect x="400" y="194" width="240" height="22" rx="4"
           fill="var(--bg-elev-2)" stroke="var(--border)"/>
         <text x="410" y="209" font-size="10"
-          font-family="ui-monospace, monospace" fill="var(--fg)">CHUNK phase  · M = 16 items (padded)</text>
+          font-family="ui-monospace, monospace" fill="var(--fg)">CHUNK phase  · variable item count</text>
       </g>
 
       <!-- Round 3: MERKLE phase -->

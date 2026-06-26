@@ -8,7 +8,7 @@ const totalPages = allPages.length;
 
 <Main
   title="BitcoinPIR · An illustrated guide"
-  description="An illustrated, source-grounded guide to the BitcoinPIR protocol: query padding, cuckoo hashing, and Merkle-verified private queries for Bitcoin wallets."
+  description="An illustrated, source-grounded guide to the BitcoinPIR protocol: private wallet queries, Merkle verification, and database authenticity."
 >
   <section class="hero">
     <div class="container">
@@ -18,8 +18,9 @@ const totalPages = allPages.length;
         BitcoinPIR lets a Bitcoin wallet ask <em>"do I own UTXOs under this
         scripthash?"</em> without revealing the scripthash. This guide walks
         through the protocol's moving parts — padding, cuckoo hashing, and
-        Merkle-verified "not found" proofs — with a small animation for
-        each. Every claim is grounded in the project's source code.
+        Merkle-verified "not found" proofs — then shows how published
+        database roots are tied back to Bitcoin block hashes and MuHash
+        anchors. Every claim is grounded in the project's source code.
       </p>
       <div class="hero__ctas">
         <a class="btn btn--primary" href={`${base}${sections[0]!.slug}/`}>

@@ -1,0 +1,94 @@
+---
+import Section from "~/components/Section.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="database-authenticity-trust" num="14" title="What is trusted">
+  <p>
+    The current checked witness ties the database proof anchor at height
+    <code>948454</code> to the BHTM proof for chunk
+    <code>mainnet-900000-954920</code>. The same height, block hash, and
+    Core-display MuHash appear on both sides of the bridge.
+  </p>
+
+  <h3>Concrete witness</h3>
+  <div class="grid-2" style="margin-top: 1.25rem;">
+    <div class="backend-card">
+      <h4>Database anchor</h4>
+      <p><span class="backend-card__tag">height</span><code>948454</code></p>
+      <p>
+        <span class="backend-card__tag">block hash</span>
+        <code>00000000000000000001ef683c02c383315db7e917c69d20f79e05985560a4e4</code>
+      </p>
+      <p>
+        <span class="backend-card__tag">MuHash</span>
+        <code>cf4fc1f1dd400622a5b6f39eca7f764a30570c30cc668e04f00e8a3356c2a2ee</code>
+      </p>
+    </div>
+    <div class="backend-card">
+      <h4>Database super-roots</h4>
+      <p>
+        <span class="backend-card__tag">bucket</span>
+        <code>e2ba2eee6788424309a95f771893d5401cc8e3ceec6188dc2708900e211a910a</code>
+      </p>
+      <p>
+        <span class="backend-card__tag">onion</span>
+        <code>f86baa3966a61cdcd70d8c0ad9bed233f591806eb351db2ae35ac0192a3fe997</code>
+      </p>
+    </div>
+  </div>
+
+  <div class="backend-card" style="margin-top: 1rem;">
+    <h4>BHTM leaf proof</h4>
+    <p><span class="backend-card__tag">chunk</span><code>mainnet-900000-954920</code></p>
+    <p><span class="backend-card__tag">leaf index</span><code>48454</code></p>
+    <p><span class="backend-card__tag">tree size</span><code>54921</code></p>
+    <p>
+      <span class="backend-card__tag">BHTM tree root</span>
+      <code>babeea635812c3b1a2d5f352ab0a5d1ee8a4e9c668c43c05d6603ef3c3766ba6</code>
+    </p>
+    <p>
+      <span class="backend-card__tag">leaf hash</span>
+      <code>0171a475dc43b97db594c7512039d12f5213d270b42e56babfa44d65359eeaaf</code>
+    </p>
+    <p><span class="backend-card__tag">proof steps</span><code>16</code></p>
+  </div>
+
+  <h3>What a verifier checks</h3>
+  <ol>
+    <li>Database answer Merkle path to the database super-root.</li>
+    <li>Database proof super-root to the snapshot height, block hash, and MuHash.</li>
+    <li>BHTM leaf proof from that same tuple to the BHTM tree root.</li>
+    <li>BHTM attestation from tree root to SEV-SNP <code>REPORT_DATA</code>.</li>
+    <li>AMD signature/VCEK chain and expected UKI measurement.</li>
+  </ol>
+
+  <Callout label="Trust boundary" kind="danger">
+    <p>
+      The attested MuHash runner checks the chain of block headers and txid
+      Merkle root commitments, then applies Core-format UTXO deltas. It is a
+      compact computation proof for the MuHash transition, not a full Bitcoin
+      consensus validator.
+    </p>
+  </Callout>
+
+  <h3>What it does not prove</h3>
+  <p>
+    The BHTM proof does not independently prove proof-of-work difficulty,
+    script or witness validity, coinbase maturity, subsidy rules, absence of
+    double spends, UTXO membership from first principles, duplicate-txid behavior,
+    genesis handling, or unspendable-output filtering. Those rules remain the
+    responsibility of the Bitcoin Core-side data source and extractor.
+  </p>
+</Section>
+
+<style>
+  #database-authenticity-trust .backend-card {
+    min-width: 0;
+  }
+
+  #database-authenticity-trust code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+</style>

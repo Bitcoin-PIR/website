@@ -1,0 +1,110 @@
+---
+import Section from "~/components/Section.astro";
+import Stage from "~/components/Stage.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="database-authenticity-chain" num="14" title="The authenticity chain">
+  <p>
+    Privacy and authenticity answer different questions. The privacy proof asks
+    what the server can learn from a wallet query. Database authenticity asks
+    whether the database root the wallet trusts is tied to Bitcoin history.
+  </p>
+  <p>
+    BitcoinPIR's authenticity story is a chain of small commitments. A PIR
+    answer is checked against database Merkle roots; those roots are bound to an
+    attested database build anchor; the anchor names a Bitcoin height, block
+    hash, and Core-style MuHash; and a separate blockhash-to-MuHash proof ties
+    that same tuple to a SEV-SNP-attested computation.
+  </p>
+
+  <Stage
+    caption="The database claim is not one magic proof. It is a path from a wallet answer to Merkle roots, then to a snapshot anchor, then to a MuHash tree root bound by attestation."
+    label="Database authenticity chain"
+  >
+    <svg viewBox="0 0 680 390" role="img"
+      aria-label="A vertical chain from PIR answer to database Merkle roots, attested database build, snapshot anchor, BHTM leaf proof, BHTM tree root, SEV-SNP quote, and Bitcoin header-linked stripped-delta stream.">
+      <defs>
+        <marker id="auth-arrow" viewBox="0 0 10 10" refX="5" refY="9"
+          markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 5 9 L 10 0 z" fill="var(--fg-muted)"/>
+        </marker>
+      </defs>
+
+      {[
+        ["1", "PIR answer", "UTXO bytes or verified absence"],
+        ["2", "Database Merkle proof", "bucket/onion path to a super-root"],
+        ["3", "Attested database build", "roots bound to build evidence"],
+        ["4", "Snapshot anchor", "height + block_hash + MuHash"],
+        ["5", "BHTM leaf proof", "same tuple under the chunk tree"],
+        ["6", "BHTM tree root", "append-only MuHash commitment"],
+        ["7", "SEV-SNP quote", "measured proof runner + report data"],
+        ["8", "Bitcoin-linked stream", "headers + txid Merkle commitments"],
+      ].map(([n, title, detail], i) => {
+        const y = 18 + i * 44;
+        const accent = i === 3 || i === 6;
+        return (
+          <g>
+            {i > 0 && (
+              <path d={`M 340 ${y - 10} L 340 ${y + 2}`}
+                stroke="var(--fg-muted)" stroke-width="1.2"
+                marker-end="url(#auth-arrow)"/>
+            )}
+            <rect x="74" y={y} width="532" height="34" rx="6"
+              fill={accent ? "var(--accent-bg)" : "var(--bg-elev-2)"}
+              stroke={accent ? "var(--accent)" : "var(--border)"}/>
+            <circle cx="96" cy={y + 17} r="10"
+              fill={accent ? "var(--accent)" : "var(--border-strong)"}/>
+            <text x="96" y={y + 21} text-anchor="middle" font-size="10"
+              font-weight="700" fill="var(--bg)">{n}</text>
+            <text x="118" y={y + 15} font-size="11" font-weight="700"
+              fill="var(--fg)">{title}</text>
+            <text x="118" y={y + 28} font-size="10"
+              fill="var(--fg-muted)">{detail}</text>
+          </g>
+        );
+      })}
+    </svg>
+  </Stage>
+
+  <h3>What this adds</h3>
+  <p>
+    Section 09 already showed how a wallet verifies returned bins against
+    published Merkle roots. This section adds the next question: where did
+    those published roots come from, and why should a verifier believe they
+    correspond to a Bitcoin snapshot?
+  </p>
+
+  <div class="grid-3" style="margin-top: 1.5rem;">
+    <div class="backend-card">
+      <h4>Database proof</h4>
+      <p>
+        Binds bucket and onion database super-roots to a snapshot anchor:
+        <code>height</code>, <code>block_hash</code>, and Core-display
+        <code>MuHash</code>.
+      </p>
+    </div>
+    <div class="backend-card">
+      <h4>BHTM proof</h4>
+      <p>
+        Shows that the same anchor appears as a leaf under an append-only
+        blockhash-to-MuHash chunk tree.
+      </p>
+    </div>
+    <div class="backend-card">
+      <h4>SEV-SNP quote</h4>
+      <p>
+        Binds the BHTM chunk tree root to a measured reusable proof-runner
+        image and checked report signature.
+      </p>
+    </div>
+  </div>
+
+  <Callout label="Two independent guarantees" kind="ok">
+    <p>
+      The privacy proof constrains what the server learns from query traffic.
+      The authenticity chain constrains what database roots the client accepts.
+      They reinforce each other, but they are not the same claim.
+    </p>
+  </Callout>
+</Section>

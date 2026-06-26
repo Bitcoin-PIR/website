@@ -29,48 +29,47 @@ import Section from "~/components/Section.astro";
   ].`}</code></pre>
   <p>
     Read aloud: whenever <code>q1, q2</code> agree on the leakage
-    record, running <code>Real.query</code> on either of them yields
-    the same result. A multi-query (batched) version of the same
-    theorem extends this to whole sessions, so privacy doesn't drift
-    across sequences of queries either. Both versions are closed; no
-    <code>admit</code> tactics. The lemmas live under
-    <code>proofs/easycrypt/</code>; the central per-query statement is
-    at <code>proofs/easycrypt/Theorem.ec:232</code>, and the multi-query
-    one at <code>:313</code>.
+    record, running <code>Real.query</code> on either yields the same
+    result. A multi-query (batched) version extends this to whole
+    sessions, so privacy doesn't drift across sequences of queries either.
+    Both versions are closed; no <code>admit</code> tactics. The lemmas
+    live under <code>proofs/easycrypt/</code>; the central per-query
+    statement is at <code>proofs/easycrypt/Theorem.ec:232</code>, and
+    the multi-query one at <code>:313</code>.
   </p>
 
-  <h3>2. Kani — the helper functions that pin the constants are exhaustively model-checked</h3>
+  <h3>2. Kani — helper-level invariants are exhaustively model-checked</h3>
   <p>
     EasyCrypt proves the <em>protocol</em> behaves as specified. Kani
     addresses a different failure mode: the spec is faithful, but the
-    Rust implementation drifts away from it. The two closure invariants
-    that pin <code>index_max_items</code> and <code>chunk_max_items</code>
-    reduce to small pure helpers — <code>pad_chunk_ids_to_m</code>,
-    <code>plan_index_pbc_rounds</code>,
-    <code>build_index_alphas_batched</code>, and friends. Each one is
-    wrapped in a <code>#[cfg(kani)]</code> harness that verifies the
-    relevant invariant — buffer length, group balance, idempotence —
-    across the function's entire input domain.
+    Rust implementation drifts away from it. The verifier checks helper
+    routines such as <code>plan_index_pbc_rounds</code>,
+    <code>plan_chunk_rounds</code>,
+    <code>pad_chunk_rounds_for_presence</code>,
+    and <code>build_index_alphas_batched</code> inline in each backend.
+    These checks verify the closed invariants (for example, index-group
+    count bounds) and protocol-shape guarantees such as CHUNK round
+    presence. The admitted <code>chunk_max</code> axis is explicitly
+    documented rather than closed.
   </p>
   <p>
     Kani is a bounded model checker for Rust: it explores the full
     state space of small functions in seconds. The harnesses live
     inline in <code>pir-sdk-client/src/dpf.rs::kani_harnesses</code>
     and the analogous modules in <code>harmony.rs</code> and
-    <code>onion.rs</code>, so they're maintained alongside the code
-    they verify.
+    <code>onion.rs</code>, so they're maintained beside the code they
+    verify.
   </p>
 
   <h3>3. Live integration tests — wire-byte equality is asserted end-to-end</h3>
   <p>
     The third layer addresses yet another failure mode: spec faithful,
     helpers correct, but the assembled client behaves differently in
-    practice (e.g. an emergent ordering bug). A test driver runs a
-    found query and a not-found query through the same client against
-    the live PIR server (<code>wss://pir1.chenweikeng.com</code>),
-    captures the full wire transcript, and asserts byte-equality round
-    by round with <code>assert_profiles_equivalent</code>. One test
-    per backend:
+    practice (for example, an emergent ordering bug). A test driver runs a
+    found query and a not-found query through the same client against the
+    live PIR deployment, captures the full wire transcript, and asserts
+    byte-equality round by round with <code>assert_profiles_equivalent</code>.
+    One test per backend:
   </p>
   <ul>
     <li><code>dpf_found_vs_not_found_have_byte_identical_profiles</code></li>

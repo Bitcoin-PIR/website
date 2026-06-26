@@ -1,0 +1,71 @@
+---
+import Section from "~/components/Section.astro";
+import Callout from "~/components/Callout.astro";
+---
+
+<Section id="database-authenticity-muhash" num="14" title="Inside the MuHash proof">
+  <p>
+    The blockhash-to-MuHash proof, abbreviated BHTM in the project docs, is
+    deliberately narrow. It is not a Bitcoin node, and it does not rebuild the
+    UTXO set from scratch. It receives compact stripped block deltas prepared by
+    a Bitcoin Core-side data source, then proves the MuHash transition over that
+    stream.
+  </p>
+
+  <h3>What the runner checks for every block</h3>
+  <div class="grid-2" style="margin-top: 1.25rem;">
+    <div class="backend-card">
+      <h4>Header hash</h4>
+      <p>
+        Recompute <code>SHA256d(80-byte header)</code> and compare it with the
+        claimed block hash.
+      </p>
+    </div>
+    <div class="backend-card">
+      <h4>Height and previous link</h4>
+      <p>
+        Check <code>height == previous_height + 1</code> and verify that the
+        header points to the previous block hash.
+      </p>
+    </div>
+    <div class="backend-card">
+      <h4>Transaction commitment</h4>
+      <p>
+        Recompute the txid Merkle root from stripped transaction bytes and
+        compare it with the header's Merkle root.
+      </p>
+    </div>
+    <div class="backend-card">
+      <h4>MuHash update</h4>
+      <p>
+        Apply supplied Bitcoin Core-style coin additions and removals to the
+        accumulator, then append <code>height || block_hash || MuHash</code>.
+      </p>
+    </div>
+  </div>
+
+  <h3>Why it stays small</h3>
+  <p>
+    The proof runner is streaming and low-storage. It does not store full
+    blocks, keep a Rust <code>HashMap</code> UTXO set, or call Bitcoin Core RPC
+    from inside the guest. The heavy state stays on the data source machine,
+    where Bitcoin Core block data, chainstate, and undo data already live.
+  </p>
+  <pre><code>{`curl | tee(hash fifo) | zstd -dc | blockhash-to-muhash job-teed -`}</code></pre>
+  <p>
+    The reusable SEV-SNP image receives a canonical <code>job.json</code> at
+    runtime. The attestation binds <code>job_sha256</code>, so public verifiers
+    can pin one image measurement while accepting different Bitcoin chunk jobs.
+    Proof artifacts are uploaded only after the compressed stream hash matches
+    the runtime job.
+  </p>
+
+  <Callout label="Reusable image measurement">
+    <p>
+      All archived chunks from <code>mainnet-000000-099999</code> through the
+      partial current-head chunk <code>mainnet-900000-954920</code> have been
+      proven with the same streaming UKI measurement:
+    </p>
+    <pre><code>652f8c813382abb0c09a7bdc6528e6a3494f9f0833eb087349ad5dac76dec140532763fec8eeaf3fa52723b6a5de8279</code></pre>
+  </Callout>
+</Section>

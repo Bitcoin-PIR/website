@@ -1,7 +1,8 @@
 # Upstream verification briefing
 
 The BitcoinPIR project (`~/BitcoinPIR/`) wrapped a multi-session
-leakage-verification effort on 2026-04-29. This file is a pointer so a
+leakage-verification effort on 2026-04-29, then updated the CHUNK
+item-count trade-off in Phase 4 / WS-A on 2026-05-17. This file is a pointer so a
 future website-session agent can find the consolidated briefing
 without needing prior context.
 
@@ -16,8 +17,9 @@ It contains:
   wire-shape simulator-property is mechanized in EasyCrypt + Kani +
   empirical tests; the cryptographic primitive reductions (DPF / FHE /
   PRP indistinguishability) are cited from the underlying papers.
-- **The four privacy invariants** — each with a `CLAUDE.md` section,
-  Kani harnesses (where applicable), and integration tests.
+- **The privacy invariants and trade-offs** — `index_max` remains
+  closed; `chunk_max` is now an admitted approximate UTXO-count leak
+  after M=16 chunk padding was removed.
 - **Verification layers** — test pyramid: EasyCrypt (31 lemmas) →
   Kani (18+ harnesses) → Rust unit tests (151) → Rust integration
   (live Hetzner) → TS unit (138 vitest) → cross-language live diff.
@@ -37,9 +39,11 @@ in the upstream codebase. The verification overview already gives
 you many citation-ready facts:
 
 - `INDEX_CUCKOO_NUM_HASHES = 2` at `pir-core/src/params.rs:154`.
-- `CHUNK_MERKLE_ITEMS_PER_QUERY = 16` at `pir-core/src/params.rs:165`.
 - `K = 75` (INDEX) at `pir-core/src/params.rs:88`.
 - `K_CHUNK = 80` (CHUNK) at `pir-core/src/params.rs:102`.
+- `chunk_max_items_per_group_per_level` is an admitted leak axis;
+  cite `CLAUDE.md` section "CHUNK Merkle Item-Count — Documented
+  Trade-off" and `docs/VERIFICATION_OVERVIEW.md:157-169`.
 - "Found and not-found queries produce byte-identical leakage profiles":
   cite the test files at `pir-sdk-client/tests/leakage_integration_test.rs`,
   test names `dpf_found_vs_not_found_have_byte_identical_profiles` (DPF),
@@ -53,14 +57,15 @@ indistinguishability. The bridge from "wire shape matches" to "wire
 bytes indistinguishable" relies on the ideal-primitive hypothesis on
 DPF / FHE / PRP, cited from the primitives' papers.
 
-For Bitcoin PIR's actual threat model — "the server should not learn
-which scripthash the user queried, nor whether it was found, nor how
-many UTXOs it has, nor the cuckoo position it matched at" — the
-verification is as tight as a non-research-project codebase can
-reasonably get. But state it precisely; don't claim "fully verified"
-or "zero leakage". The leakage record `L(q)` is allowed to leak
-`query_db_id` (intentional public metadata) and HarmonyPIR's
-`session_query_index` (function of session length, already public).
+For Bitcoin PIR's current threat model, the server should not learn
+which scripthash the user queried, whether it was found, or the
+cuckoo position it matched at. It does now admit approximate
+per-query UTXO count via `chunk_max_items_per_group_per_level`.
+State this precisely; don't claim "fully verified" or "zero leakage".
+The leakage record `L(q)` is allowed to leak `query_db_id`
+(intentional public metadata), HarmonyPIR's `session_query_index`
+(function of session length, already public), and the documented
+`chunk_max` axis.
 
 ## Quick stats for site copy
 
@@ -85,16 +90,16 @@ If the upstream verification layer evolves:
 - Update site copy (likely under `src/content/` or `src/pages/`)
   with cross-references in `CONTENT-AUDIT.md`.
 
-## Site implementation status (last touched 2026-05-27)
+## Site implementation status (last touched 2026-06-20)
 
 The verification/privacy material is now implemented on the site.
 Map of what exists, so a future session can resume without re-deriving:
 
 **Section 12 — "What the server learns"** (`tradeoffs`), 2 pages:
 - `12-Tradeoffs-Wire.astro` (`/tradeoffs/`) — the CANNOT/CAN-learn
-  grid, corrected so found-vs-not-found and UTXO-count are in the
-  CANNOT column (the closures made the old "Server CAN observe"
-  claims false). Forward-links to section 13.
+  grid, corrected so found-vs-not-found stays in the CANNOT column
+  while approximate UTXO count / `chunk_max` is listed as an admitted
+  CAN-observe trade-off. Forward-links to section 13.
 - `12-Tradeoffs-Beyond.astro` (`/tradeoffs/beyond-the-server/`) —
   network observers, colluding DPF servers, compromised client state.
 
@@ -123,26 +128,25 @@ Map of what exists, so a future session can resume without re-deriving:
 - `c394fe1e` / `34c2bb0b`: PRP_ALF retired. HarmonyPIR permutation
   page now lists only HMR12 + FastPRP (FastPRP default). ALF kept as
   a one-line historical note.
-- `08d4725a` / `ccf2033a`: synthetic CHUNK padding is now
-  scripthash-seeded (`SHA-256("BPIR-CHUNK-PAD" || sh || idx)`), not
-  the literal `[0..M-1]`. Reflected in section 13.1's `L(q)` bullet.
+- `08d4725a` / `ccf2033a`: historical CHUNK-padding sync. This was
+  later superseded by the Phase 4 / WS-A removal below.
+- Phase 4 / WS-A (`[HUMAN decision, 2026-05-17]`): the M=16 CHUNK
+  padding path was removed, so `chunk_max_items_per_group_per_level`
+  is again an admitted leakage axis rather than a closed invariant.
 
 **Citation line numbers verified this session** (drift fast — re-grep
 before trusting): CLAUDE.md invariants — Per-Group Request-Count
 `121-143`, INDEX Merkle Group-Symmetry `144-194`, CHUNK Merkle
-Item-Count `196-258`. Byte-identity tests in
+Item-Count / Documented Trade-off `202-258`. Byte-identity tests in
 `pir-sdk-client/tests/leakage_integration_test.rs` — dpf `:1349`,
 harmony `:888`, onion `:1549`; comparator `assert_profiles_equivalent:215`.
-`pad_chunk_ids_to_m` at `pir-sdk-client/src/dpf.rs:2744`.
+The old `pad_chunk_ids_to_m` / synthetic CHUNK-padding path is now
+dead-code removed upstream.
 Note: `request_bytes`/`response_bytes` in the test framework are
 u64 byte *counts*, not raw bytes — "byte-identical" means equal
 lengths + equal structural item vectors, not equal ciphertext.
 
 **Known follow-ups (not blocking):**
-- Section 13 says "two [axes] are pinned to constants by closure
-  invariants." There are actually 5 MANDATORY-for-Privacy invariants
-  in CLAUDE.md now; the 4-field `L` is still the external claim, so
-  this was intentionally left as-is (user confirmed "leave it").
 - No animation on the empty-count page yet (worked example + callout
   only). A two-request "different composition, identical byte count"
   SVG could be added if it reads dense.

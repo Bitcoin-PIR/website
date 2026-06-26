@@ -24,6 +24,9 @@ import TradeoffsBeyond from "~/components/sections/12-Tradeoffs-Beyond.astro";
 import VerificationLeakage from "~/components/sections/13-Verification-Leakage.astro";
 import VerificationEvidence from "~/components/sections/13-Verification-Evidence.astro";
 import VerificationScope from "~/components/sections/13-Verification-Scope.astro";
+import DatabaseAuthenticityChain from "~/components/sections/14-DatabaseAuthenticity-Chain.astro";
+import DatabaseAuthenticityMuHash from "~/components/sections/14-DatabaseAuthenticity-MuHash.astro";
+import DatabaseAuthenticityTrust from "~/components/sections/14-DatabaseAuthenticity-Trust.astro";
 
 export interface Page {
   slug: string;
@@ -205,6 +208,32 @@ export const sections: Section[] = [
         title: "What's not in scope",
         blurb: "Wire shape vs cryptographic indistinguishability.",
         component: VerificationScope,
+      },
+    ],
+  },
+  {
+    num: "14",
+    slug: "database-authenticity",
+    title: "How we know the database matches Bitcoin",
+    blurb: "Merkle roots, MuHash anchors, and attested build evidence.",
+    pages: [
+      {
+        slug: "chain",
+        title: "The authenticity chain",
+        blurb: "From PIR answer to database roots to Bitcoin history.",
+        component: DatabaseAuthenticityChain,
+      },
+      {
+        slug: "muhash-proof",
+        title: "Inside the MuHash proof",
+        blurb: "Header links, txid Merkle roots, Core-style deltas.",
+        component: DatabaseAuthenticityMuHash,
+      },
+      {
+        slug: "trust-boundary",
+        title: "What is trusted",
+        blurb: "Concrete witness values and the honest non-goals.",
+        component: DatabaseAuthenticityTrust,
       },
     ],
   },
